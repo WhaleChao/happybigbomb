@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { Download, Grid, RotateCcw, Sun, Contrast, Droplets, Image as ImageIcon, RectangleHorizontal, RectangleVertical, Square, Smartphone } from 'lucide-react';
+import { Download, Grid, RotateCcw, Sun, Contrast, Droplets, Image as ImageIcon, RectangleHorizontal, RectangleVertical, Square, Smartphone, Palette, Trash2 } from 'lucide-react';
 import './App.css';
 
 // --- Aspect Ratio Options ---
@@ -307,23 +307,43 @@ function App() {
 
   const selected = selectedCell !== null ? cells[selectedCell] : null;
 
+  // --- Mobile tab state ---
+  const [mobileTab, setMobileTab] = useState<'canvas' | 'layout' | 'effects'>('canvas');
+
+  // --- Cache Clear ---
+  const clearCache = useCallback(async () => {
+    if ('serviceWorker' in navigator) {
+      const registrations = await navigator.serviceWorker.getRegistrations();
+      for (const reg of registrations) { await reg.unregister(); }
+    }
+    const keys = await caches.keys();
+    for (const key of keys) { await caches.delete(key); }
+    alert('快取已清除！即將重新載入…');
+    window.location.reload();
+  }, []);
+
   return (
     <div className="app-container gradient-bg">
       {/* Header */}
       <header className="glass-morphism">
         <div className="header-content">
           <h1>⚡ 小皮大霹靂</h1>
-          <button className="btn-primary export-btn" onClick={exportAsPng}>
-            <Download size={18} />
-            <span>匯出 PNG</span>
-          </button>
+          <div className="header-actions">
+            <button className="btn-icon cache-btn" onClick={clearCache} title="清除快取">
+              <Trash2 size={16} />
+            </button>
+            <button className="btn-primary export-btn" onClick={exportAsPng}>
+              <Download size={18} />
+              <span>匯出 PNG</span>
+            </button>
+          </div>
         </div>
       </header>
 
       <main>
         <div className="editor-layout">
           {/* Left Panel: Layout Selector */}
-          <aside className="left-sidebar glass-morphism">
+          <aside className={`left-sidebar glass-morphism ${mobileTab === 'layout' ? 'mobile-visible' : ''}`}>
             <h2><Grid size={14} /> 版面佈局</h2>
             <div className="layout-grid">
               {LAYOUTS.map((l, i) => (
@@ -443,7 +463,7 @@ function App() {
           </section>
 
           {/* Right Panel: Effects per Cell */}
-          <aside className="right-sidebar glass-morphism">
+          <aside className={`right-sidebar glass-morphism ${mobileTab === 'effects' ? 'mobile-visible' : ''}`}>
             {selected ? (
               <>
                 <div className="panel-header">
@@ -576,6 +596,22 @@ function App() {
           </aside>
         </div>
       </main>
+
+      {/* Mobile Bottom Nav */}
+      <nav className="mobile-nav glass-morphism">
+        <button className={`mobile-nav-btn ${mobileTab === 'canvas' ? 'active' : ''}`} onClick={() => setMobileTab('canvas')}>
+          <ImageIcon size={20} />
+          <span>畫布</span>
+        </button>
+        <button className={`mobile-nav-btn ${mobileTab === 'layout' ? 'active' : ''}`} onClick={() => setMobileTab('layout')}>
+          <Grid size={20} />
+          <span>佈局</span>
+        </button>
+        <button className={`mobile-nav-btn ${mobileTab === 'effects' ? 'active' : ''}`} onClick={() => setMobileTab('effects')}>
+          <Palette size={20} />
+          <span>效果</span>
+        </button>
+      </nav>
     </div>
   );
 }

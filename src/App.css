@@ -474,3 +474,164 @@ input[type="range"] {
   font-size: 0.9rem;
   text-align: center;
 }
+
+/* ===== HEADER ACTIONS ===== */
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cache-btn {
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+.cache-btn:hover {
+  background: rgba(239, 68, 68, 0.3);
+  border-color: #f87171;
+  color: #fff;
+}
+
+/* ===== MOBILE NAV (hidden on desktop) ===== */
+.mobile-nav {
+  display: none;
+}
+
+/* ===== MOBILE RESPONSIVE ===== */
+@media (max-width: 768px) {
+  header {
+    height: 52px;
+    padding: 0 12px;
+  }
+
+  header h1 {
+    font-size: 1rem;
+  }
+
+  .export-btn span {
+    display: none;
+  }
+
+  .export-btn {
+    padding: 8px 12px;
+    font-size: 0.8rem;
+  }
+
+  main {
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .editor-layout {
+    position: relative;
+    height: 100%;
+  }
+
+  /* Hide sidebars by default on mobile */
+  .left-sidebar,
+  .right-sidebar {
+    display: none;
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 20;
+    padding: 16px;
+  }
+
+  .left-sidebar.mobile-visible,
+  .right-sidebar.mobile-visible {
+    display: flex;
+  }
+
+  /* Canvas fills screen on mobile */
+  .canvas-area {
+    padding: 8px;
+    width: 100%;
+    height: 100%;
+  }
+
+  .canvas-wrapper.portrait {
+    height: 100%;
+    width: auto;
+    max-width: 100%;
+  }
+
+  .canvas-wrapper.landscape {
+    width: 100%;
+    height: auto;
+    max-height: 100%;
+  }
+
+  .cell-upload {
+    font-size: 0.65rem;
+    gap: 4px;
+  }
+
+  .cell-upload svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  /* Grid adjustments */
+  .layout-grid {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+  }
+
+  .ratio-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .presets-grid {
+    grid-template-columns: repeat(4, 1fr);
+  }
+
+  /* ===== MOBILE BOTTOM NAV ===== */
+  .mobile-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 64px;
+    z-index: 100;
+    justify-content: space-around;
+    align-items: center;
+    padding: 0 8px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    border-top: 1px solid var(--border);
+  }
+
+  .mobile-nav-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 8px 16px;
+    border-radius: 12px;
+    background: transparent;
+    border: none;
+    color: var(--secondary);
+    font-size: 0.65rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .mobile-nav-btn.active {
+    color: var(--accent);
+    background: rgba(59, 130, 246, 0.15);
+  }
+
+  /* Adjust main to account for bottom nav */
+  .app-container {
+    height: 100vh;
+    height: 100dvh;
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+}
