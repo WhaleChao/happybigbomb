@@ -451,9 +451,9 @@ function App() {
     });
     maxDur = Math.min(maxDur, 15);
 
-    // Reset all videos to start
+    // Pause all videos so we can manually control currentTime
     const videoEls = Array.from(gridEl.querySelectorAll('video')) as HTMLVideoElement[];
-    videoEls.forEach(v => { v.currentTime = 0; v.play(); });
+    videoEls.forEach(v => { v.pause(); v.currentTime = 0; });
 
     const cellEls = gridEl.querySelectorAll('.grid-cell');
 
@@ -537,7 +537,8 @@ function App() {
     const gif = GIFEncoder();
 
     let frameCount = 0;
-    const captureNextFrame = () => {
+
+    const captureNextFrame = async () => {
       if (frameCount >= totalFrames) {
         gif.finish();
         const output = gif.bytes();
@@ -547,20 +548,43 @@ function App() {
         return;
       }
 
+      // 1. Advance all actual videos to the correct timestamp
+      const currentTime = frameCount * (delayMs / 1000);
+      const seekPromises = videoEls.map(v => {
+        return new Promise<void>(resolve => {
+          // If video ended or is shorter than current time, we can skip seeking
+          if (v.duration && currentTime > v.duration) return resolve();
+          const onSeeked = () => {
+            v.removeEventListener('seeked', onSeeked);
+            resolve();
+          };
+          v.addEventListener('seeked', onSeeked);
+          v.currentTime = currentTime;
+        });
+      });
+
+      // Wait for all videos to seek
+      if (seekPromises.length > 0) {
+        // Add a small timeout to perfectly resolve frozen videos
+        await Promise.race([Promise.all(seekPromises), new Promise(r => setTimeout(r, 200))]);
+      }
+
       drawFrame();
       const imageData = ctx.getImageData(0, 0, cw, ch);
       const palette = quantize(imageData.data, 256);
       const index = applyPalette(imageData.data, palette);
-      // Set repeat: 0 (infinite loop) only on first frame
       const opts: Record<string, unknown> = { palette, delay: Math.round(delayMs) };
       if (frameCount === 0) opts.repeat = 0;
       gif.writeFrame(index, cw, ch, opts);
 
       frameCount++;
-      setTimeout(() => requestAnimationFrame(captureNextFrame), delayMs);
+
+      // Since we manually seeked, we don't need a long delay. Just queue the next frame
+      requestAnimationFrame(captureNextFrame);
     };
 
-    setTimeout(() => requestAnimationFrame(captureNextFrame), 200);
+    // Start capture loop
+    requestAnimationFrame(captureNextFrame);
   }, [bgColor, borderRadius, isRecording, cells, downloadBlob]);
 
 
