@@ -259,27 +259,27 @@ function App() {
     const mediaType: 'video' | 'gif' | 'image' = isVideo ? 'video' : isGif ? 'gif' : 'image';
 
     if (isVideo) {
-      // Get actual video duration
+      // Create a SEPARATE blob URL for duration detection (don't reuse the cell's URL)
+      const metaUrl = URL.createObjectURL(file);
       const tempVideo = document.createElement('video');
       tempVideo.preload = 'metadata';
       tempVideo.onloadedmetadata = () => {
         const dur = tempVideo.duration;
         setCells(prev => prev.map(c =>
           c.id === cellId
-            ? { ...c, imageUrl: objectUrl, objectUrl, mediaType, duration: isFinite(dur) ? dur : 10 }
+            ? { ...c, duration: isFinite(dur) ? dur : 10 }
             : c
         ));
-        URL.revokeObjectURL(tempVideo.src);
+        URL.revokeObjectURL(metaUrl); // Revoke the separate URL, not the cell's URL
       };
-      tempVideo.src = objectUrl;
-      // Also set immediately (duration will update when metadata loads)
+      tempVideo.src = metaUrl;
+      // Set cell immediately (duration will update when metadata loads)
       setCells(prev => prev.map(c =>
         c.id === cellId
           ? { ...c, imageUrl: objectUrl, objectUrl, mediaType, duration: 5 }
           : c
       ));
     } else {
-      // GIF defaults to 6s, static image = 0
       setCells(prev => prev.map(c =>
         c.id === cellId
           ? { ...c, imageUrl: objectUrl, objectUrl, mediaType, duration: isGif ? 6 : 0 }
@@ -321,6 +321,27 @@ function App() {
   // --- Export ---
   const hasAnimated = cells.some(c => (c.mediaType === 'video' || c.mediaType === 'gif') && c.imageUrl);
 
+  // --- Download helper (works on mobile Safari too) ---
+  const downloadBlob = useCallback(async (blob: Blob, filename: string) => {
+    // Try navigator.share first (mobile-friendly)
+    if (navigator.share && /Mobi|Android/i.test(navigator.userAgent)) {
+      try {
+        const file = new File([blob], filename, { type: blob.type });
+        await navigator.share({ files: [file], title: filename });
+        return;
+      } catch (_) { /* user cancelled or not supported, fall through */ }
+    }
+    // Fallback: create <a> download link
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = filename;
+    link.href = url;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    setTimeout(() => URL.revokeObjectURL(url), 5000);
+  }, []);
+
   const exportAsPng = useCallback(async () => {
     if (!gridRef.current) return;
 
@@ -336,11 +357,10 @@ function App() {
       height: rect.height,
     });
 
-    const link = document.createElement('a');
-    link.download = `story-grid-${Date.now()}.png`;
-    link.href = canvas.toDataURL('image/png');
-    link.click();
-  }, [bgColor]);
+    canvas.toBlob((blob) => {
+      if (blob) downloadBlob(blob, `story-grid-${Date.now()}.png`);
+    }, 'image/png');
+  }, [bgColor, downloadBlob]);
 
   // --- Export as GIF (infinite loop) ---
   const [isRecording, setIsRecording] = useState(false);
@@ -368,7 +388,7 @@ function App() {
         maxDur = Math.max(maxDur, c.duration);
       }
     });
-    maxDur = Math.min(maxDur, 15); // cap at 15s for GIF file size
+    maxDur = Math.min(maxDur, 15);
 
     // Reset all videos to start
     const videoEls = Array.from(gridEl.querySelectorAll('video')) as HTMLVideoElement[];
@@ -376,7 +396,6 @@ function App() {
 
     const cellEls = gridEl.querySelectorAll('.grid-cell');
 
-    // Draw one frame
     const drawFrame = () => {
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, cw, ch);
@@ -401,7 +420,6 @@ function App() {
         ctx.roundRect(dx, dy, dw, dh, r);
         ctx.clip();
 
-        // Object-fit: cover
         const cellAR = dw / dh;
         const mediaAR = nw / nh;
         let sx: number, sy: number, sw: number, sh: number;
@@ -415,24 +433,18 @@ function App() {
       });
     };
 
-    // Capture frames
     const fps = 10;
-    const delay = 1000 / fps;
+    const delayMs = 1000 / fps;
     const totalFrames = Math.round(maxDur * fps);
     const gif = GIFEncoder();
 
     let frameCount = 0;
     const captureNextFrame = () => {
       if (frameCount >= totalFrames) {
-        // Finish and download
         gif.finish();
         const output = gif.bytes();
         const blob = new Blob([output], { type: 'image/gif' });
-        const link = document.createElement('a');
-        link.download = `story-grid-${Date.now()}.gif`;
-        link.href = URL.createObjectURL(blob);
-        link.click();
-        URL.revokeObjectURL(link.href);
+        downloadBlob(blob, `story-grid-${Date.now()}.gif`);
         setIsRecording(false);
         return;
       }
@@ -441,16 +453,17 @@ function App() {
       const imageData = ctx.getImageData(0, 0, cw, ch);
       const palette = quantize(imageData.data, 256);
       const index = applyPalette(imageData.data, palette);
-      gif.writeFrame(index, cw, ch, { palette, delay: Math.round(delay), repeat: 0 });
+      // Set repeat: 0 (infinite loop) only on first frame
+      const opts: Record<string, unknown> = { palette, delay: Math.round(delayMs) };
+      if (frameCount === 0) opts.repeat = 0;
+      gif.writeFrame(index, cw, ch, opts);
 
       frameCount++;
-      // Use setTimeout to allow video to advance between frames
-      setTimeout(() => requestAnimationFrame(captureNextFrame), delay);
+      setTimeout(() => requestAnimationFrame(captureNextFrame), delayMs);
     };
 
-    // Wait a moment for videos to start playing, then begin capture
     setTimeout(() => requestAnimationFrame(captureNextFrame), 200);
-  }, [bgColor, borderRadius, isRecording, cells]);
+  }, [bgColor, borderRadius, isRecording, cells, downloadBlob]);
 
 
 
