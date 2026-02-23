@@ -531,7 +531,7 @@ function App() {
       });
     };
 
-    const fps = 10;
+    const fps = 20;
     const delayMs = 1000 / fps;
     const totalFrames = Math.round(maxDur * fps);
     const gif = GIFEncoder();
