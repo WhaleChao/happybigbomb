@@ -26,6 +26,7 @@ interface CellData {
   imageUrl: string | null;
   objectUrl: string | null;
   mediaType: 'image' | 'video' | 'gif';
+  duration: number; // seconds, 0 for static images
   filters: {
     brightness: number;
     contrast: number;
@@ -186,6 +187,7 @@ function createCells(layout: LayoutTemplate): CellData[] {
     imageUrl: null,
     objectUrl: null,
     mediaType: 'image' as const,
+    duration: 0,
     filters: { ...DEFAULT_FILTERS },
     objectFit: 'cover' as const,
     scale: 100,
@@ -255,11 +257,35 @@ function App() {
     const isVideo = file.type.startsWith('video/');
     const isGif = file.type === 'image/gif' || file.name.toLowerCase().endsWith('.gif');
     const mediaType: 'video' | 'gif' | 'image' = isVideo ? 'video' : isGif ? 'gif' : 'image';
-    setCells(prev => prev.map(c =>
-      c.id === cellId
-        ? { ...c, imageUrl: objectUrl, objectUrl: objectUrl, mediaType }
-        : c
-    ));
+
+    if (isVideo) {
+      // Get actual video duration
+      const tempVideo = document.createElement('video');
+      tempVideo.preload = 'metadata';
+      tempVideo.onloadedmetadata = () => {
+        const dur = tempVideo.duration;
+        setCells(prev => prev.map(c =>
+          c.id === cellId
+            ? { ...c, imageUrl: objectUrl, objectUrl, mediaType, duration: isFinite(dur) ? dur : 10 }
+            : c
+        ));
+        URL.revokeObjectURL(tempVideo.src);
+      };
+      tempVideo.src = objectUrl;
+      // Also set immediately (duration will update when metadata loads)
+      setCells(prev => prev.map(c =>
+        c.id === cellId
+          ? { ...c, imageUrl: objectUrl, objectUrl, mediaType, duration: 5 }
+          : c
+      ));
+    } else {
+      // GIF defaults to 6s, static image = 0
+      setCells(prev => prev.map(c =>
+        c.id === cellId
+          ? { ...c, imageUrl: objectUrl, objectUrl, mediaType, duration: isGif ? 6 : 0 }
+          : c
+      ));
+    }
   };
 
   const updateCellFilter = (cellId: number, key: keyof CellData['filters'], value: number) => {
@@ -325,7 +351,7 @@ function App() {
 
     const gridEl = gridRef.current;
     const gridRect = gridEl.getBoundingClientRect();
-    const scale = 2;
+    const scale = 1; // Use 1x for smooth recording
     const cw = Math.round(gridRect.width * scale);
     const ch = Math.round(gridRect.height * scale);
 
@@ -334,15 +360,17 @@ function App() {
     canvas.height = ch;
     const ctx = canvas.getContext('2d')!;
 
-    // Determine recording duration from longest video, capped at 10s
-    const videoEls = Array.from(gridEl.querySelectorAll('video'));
+    // Use stored durations from cells, capped at 30s
     let maxDur = 3;
-    videoEls.forEach(v => {
-      if (v.duration && isFinite(v.duration)) maxDur = Math.max(maxDur, v.duration);
+    cells.forEach(c => {
+      if ((c.mediaType === 'video' || c.mediaType === 'gif') && c.duration > 0) {
+        maxDur = Math.max(maxDur, c.duration);
+      }
     });
-    maxDur = Math.min(maxDur, 10);
+    maxDur = Math.min(maxDur, 30);
 
     // Reset all videos to start
+    const videoEls = Array.from(gridEl.querySelectorAll('video')) as HTMLVideoElement[];
     videoEls.forEach(v => { v.currentTime = 0; v.play(); });
 
     // Setup MediaRecorder
@@ -427,7 +455,7 @@ function App() {
       requestAnimationFrame(animate);
     };
     animate();
-  }, [bgColor, borderRadius, isRecording]);
+  }, [bgColor, borderRadius, isRecording, cells]);
 
 
   const selected = selectedCell !== null ? cells[selectedCell] : null;
