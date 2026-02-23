@@ -1,0 +1,476 @@
+/* ===== LAYOUT ===== */
+.app-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+header {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+header h1 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  background: linear-gradient(135deg, #fff 0%, #a1a1ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.export-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+}
+
+main {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+}
+
+.editor-layout {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+
+/* ===== LEFT SIDEBAR ===== */
+.left-sidebar,
+.right-sidebar {
+  width: 300px;
+  height: 100%;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.left-sidebar::-webkit-scrollbar,
+.right-sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.left-sidebar::-webkit-scrollbar-thumb,
+.right-sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+}
+
+h2 {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--secondary);
+  letter-spacing: 0.1em;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+h3 {
+  font-size: 0.8rem;
+  color: var(--secondary);
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+/* ===== LAYOUT SELECTOR ===== */
+.layout-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.layout-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 4px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.8rem;
+}
+
+.layout-btn:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+}
+
+.layout-btn.active {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.layout-icon {
+  font-size: 1.1rem;
+  letter-spacing: 0.05em;
+}
+
+.layout-name {
+  font-size: 0.7rem;
+  opacity: 0.7;
+}
+
+/* ===== RATIO SELECTOR ===== */
+.ratio-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+
+.ratio-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 8px 4px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ratio-btn:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent);
+}
+
+.ratio-btn.active {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ratio-icon {
+  display: flex;
+  align-items: center;
+}
+
+.ratio-name {
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.ratio-label {
+  font-size: 0.6rem;
+  opacity: 0.6;
+}
+
+
+/* ===== CANVAS SETTINGS ===== */
+.canvas-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.setting-row label {
+  font-size: 0.8rem;
+  color: var(--secondary);
+  white-space: nowrap;
+  min-width: 42px;
+}
+
+.setting-row input[type="range"] {
+  flex: 1;
+}
+
+.setting-row input[type="color"] {
+  width: 36px;
+  height: 28px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: transparent;
+  cursor: pointer;
+  padding: 2px;
+}
+
+.setting-value {
+  font-size: 0.7rem;
+  color: var(--secondary);
+  min-width: 32px;
+  text-align: right;
+}
+
+/* ===== CENTER CANVAS ===== */
+.canvas-area {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: rgba(0, 0, 0, 0.4);
+  overflow: hidden;
+}
+
+.canvas-wrapper {
+  max-width: 100%;
+  max-height: 100%;
+  position: relative;
+  box-shadow: 0 25px 65px -12px rgba(0, 0, 0, 0.6);
+  transition: all 0.3s ease;
+}
+
+.canvas-wrapper.portrait {
+  height: 100%;
+  width: auto;
+}
+
+.canvas-wrapper.landscape {
+  width: 100%;
+  height: auto;
+}
+
+
+.photo-grid {
+  width: 100%;
+  height: 100%;
+}
+
+/* ===== GRID CELLS ===== */
+.grid-cell {
+  background: rgba(255, 255, 255, 0.03);
+  transition: box-shadow 0.2s ease, outline 0.2s ease;
+  outline: 2px solid transparent;
+}
+
+.grid-cell:hover {
+  outline: 2px solid rgba(59, 130, 246, 0.4);
+}
+
+.grid-cell.selected {
+  outline: 2px solid var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.grid-cell img {
+  display: block;
+  pointer-events: none;
+}
+
+.cell-upload {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  cursor: pointer;
+  color: var(--secondary);
+  font-size: 0.75rem;
+  transition: all 0.2s ease;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.cell-upload:hover {
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--accent);
+}
+
+.cell-index {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  pointer-events: none;
+}
+
+/* ===== RIGHT SIDEBAR ===== */
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.btn-icon {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--secondary);
+  padding: 6px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+}
+
+.btn-icon:hover {
+  color: var(--primary);
+  border-color: var(--accent);
+}
+
+/* ===== PRESETS ===== */
+.presets-section {
+  margin-top: 4px;
+}
+
+.presets-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.preset-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 3px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--secondary);
+  font-size: 0.6rem;
+}
+
+.preset-btn:hover {
+  border-color: var(--accent);
+  color: var(--primary);
+}
+
+.preset-preview {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 6px;
+  background-size: cover;
+  background-position: center;
+}
+
+/* ===== FILTERS / CONTROLS ===== */
+.filters-section,
+.size-section {
+  margin-top: 8px;
+}
+
+.control-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.control-group label {
+  font-size: 0.8rem;
+  color: var(--secondary);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.slider-row input[type="range"] {
+  flex: 1;
+}
+
+.slider-row span {
+  font-size: 0.7rem;
+  color: var(--secondary);
+  min-width: 36px;
+  text-align: right;
+}
+
+input[type="range"] {
+  width: 100%;
+  accent-color: var(--accent);
+  height: 4px;
+}
+
+/* ===== FIT TOGGLE ===== */
+.fit-toggle {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.fit-btn {
+  flex: 1;
+  padding: 8px;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fit-btn.active {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.fit-btn:hover:not(.active) {
+  background: var(--surface-hover);
+}
+
+/* ===== REPLACE BUTTON ===== */
+.replace-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  margin-top: auto;
+}
+
+/* ===== EMPTY PANEL ===== */
+.empty-panel {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--secondary);
+  font-size: 0.9rem;
+  text-align: center;
+}
