@@ -537,6 +537,7 @@ function App() {
     const gif = GIFEncoder();
 
     let frameCount = 0;
+    let masterPalette: number[][] | null = null;
 
     const captureNextFrame = async () => {
       if (frameCount >= totalFrames) {
@@ -571,9 +572,14 @@ function App() {
 
       drawFrame();
       const imageData = ctx.getImageData(0, 0, cw, ch);
-      const palette = quantize(imageData.data, 256);
-      const index = applyPalette(imageData.data, palette);
-      const opts: Record<string, unknown> = { palette, delay: Math.round(delayMs) };
+
+      // Use a single master palette for the entire GIF to prevent color flickering/shifting on static images
+      if (!masterPalette) {
+        masterPalette = quantize(imageData.data, 256, { format: 'rgba4444' });
+      }
+
+      const index = applyPalette(imageData.data, masterPalette);
+      const opts: Record<string, unknown> = { palette: masterPalette, delay: Math.round(delayMs) };
       if (frameCount === 0) opts.repeat = 0;
       gif.writeFrame(index, cw, ch, opts);
 
