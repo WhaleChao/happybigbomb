@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from 'react';
-import { Download, Grid, RotateCcw, Sun, Contrast, Droplets, Image as ImageIcon, RectangleHorizontal, RectangleVertical, Square, Smartphone, Palette, Trash2 } from 'lucide-react';
+import { Download, Grid, RotateCcw, Sun, Contrast, Droplets, Image as ImageIcon, RectangleHorizontal, RectangleVertical, Square, Smartphone, Palette, Trash2, Film } from 'lucide-react';
 import './App.css';
 
 // --- Aspect Ratio Options ---
@@ -25,6 +25,7 @@ interface CellData {
   id: number;
   imageUrl: string | null;
   objectUrl: string | null;
+  mediaType: 'image' | 'video';
   filters: {
     brightness: number;
     contrast: number;
@@ -184,6 +185,7 @@ function createCells(layout: LayoutTemplate): CellData[] {
     id: i,
     imageUrl: null,
     objectUrl: null,
+    mediaType: 'image' as const,
     filters: { ...DEFAULT_FILTERS },
     objectFit: 'cover' as const,
     scale: 100,
@@ -246,13 +248,14 @@ function App() {
     }
   };
 
-  const handleCellImageUpload = (cellId: number, e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCellMediaUpload = (cellId: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const objectUrl = URL.createObjectURL(file);
+    const isVideo = file.type.startsWith('video/');
     setCells(prev => prev.map(c =>
       c.id === cellId
-        ? { ...c, imageUrl: objectUrl, objectUrl: objectUrl }
+        ? { ...c, imageUrl: objectUrl, objectUrl: objectUrl, mediaType: isVideo ? 'video' as const : 'image' as const }
         : c
     ));
   };
@@ -305,6 +308,63 @@ function App() {
     link.click();
   }, [bgColor]);
 
+  // --- Check if any cell has video ---
+  const hasVideo = cells.some(c => c.mediaType === 'video' && c.imageUrl);
+
+  // --- Export as MP4 ---
+  const exportAsMp4 = useCallback(async () => {
+    if (!gridRef.current) return;
+    const el = gridRef.current;
+    const rect = el.getBoundingClientRect();
+    const scale = 2;
+    const w = Math.round(rect.width * scale);
+    const h = Math.round(rect.height * scale);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d')!;
+
+    // Use html2canvas to render frames
+    const { default: html2canvas } = await import('html2canvas');
+
+    const stream = canvas.captureStream(30);
+    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+    const chunks: Blob[] = [];
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+
+    recorder.onstop = () => {
+      const blob = new Blob(chunks, { type: 'video/webm' });
+      const link = document.createElement('a');
+      link.download = `story-grid-${Date.now()}.webm`;
+      link.href = URL.createObjectURL(blob);
+      link.click();
+      URL.revokeObjectURL(link.href);
+    };
+
+    recorder.start();
+
+    // Record for 3 seconds, capturing frames
+    const duration = 3000;
+    const fps = 15;
+    const interval = 1000 / fps;
+    let elapsed = 0;
+
+    const captureFrame = async () => {
+      if (elapsed >= duration) {
+        recorder.stop();
+        return;
+      }
+      const frame = await html2canvas(el, { backgroundColor: bgColor, scale, useCORS: true, logging: false });
+      ctx.clearRect(0, 0, w, h);
+      ctx.drawImage(frame, 0, 0, w, h);
+      elapsed += interval;
+      setTimeout(captureFrame, interval);
+    };
+
+    captureFrame();
+  }, [bgColor]);
+
   const selected = selectedCell !== null ? cells[selectedCell] : null;
 
   // --- Mobile tab state ---
@@ -332,6 +392,12 @@ function App() {
             <button className="btn-icon cache-btn" onClick={clearCache} title="清除快取">
               <Trash2 size={16} />
             </button>
+            {hasVideo ? (
+              <button className="btn-primary export-btn" onClick={exportAsMp4}>
+                <Film size={18} />
+                <span>匯出 影片</span>
+              </button>
+            ) : null}
             <button className="btn-primary export-btn" onClick={exportAsPng}>
               <Download size={18} />
               <span>匯出 PNG</span>
@@ -429,28 +495,46 @@ function App() {
                       onClick={() => setSelectedCell(i)}
                     >
                       {cell.imageUrl ? (
-                        <img
-                          src={cell.imageUrl}
-                          alt=""
-                          style={{
-                            width: '100%',
-                            height: '100%',
-                            objectFit: cell.objectFit,
-                            filter: getFilterString(cell.filters),
-                            transform: `scale(${cell.scale / 100}) translate(${cell.offsetX}px, ${cell.offsetY}px)`,
-                            transition: 'filter 0.3s ease',
-                          }}
-                          draggable={false}
-                        />
+                        cell.mediaType === 'video' ? (
+                          <video
+                            src={cell.imageUrl}
+                            autoPlay
+                            loop
+                            muted
+                            playsInline
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: cell.objectFit,
+                              filter: getFilterString(cell.filters),
+                              transform: `scale(${cell.scale / 100}) translate(${cell.offsetX}px, ${cell.offsetY}px)`,
+                              transition: 'filter 0.3s ease',
+                            }}
+                          />
+                        ) : (
+                          <img
+                            src={cell.imageUrl}
+                            alt=""
+                            style={{
+                              width: '100%',
+                              height: '100%',
+                              objectFit: cell.objectFit,
+                              filter: getFilterString(cell.filters),
+                              transform: `scale(${cell.scale / 100}) translate(${cell.offsetX}px, ${cell.offsetY}px)`,
+                              transition: 'filter 0.3s ease',
+                            }}
+                            draggable={false}
+                          />
+                        )
                       ) : (
                         <label className="cell-upload">
                           <ImageIcon size={28} />
                           <span>點擊上傳</span>
                           <input
                             type="file"
-                            accept="image/*"
+                            accept="image/*,video/*"
                             hidden
-                            onChange={(e) => handleCellImageUpload(i, e)}
+                            onChange={(e) => handleCellMediaUpload(i, e)}
                           />
                         </label>
                       )}
@@ -583,9 +667,9 @@ function App() {
                 {/* Replace Image */}
                 <label className="replace-btn btn-secondary">
                   <ImageIcon size={16} />
-                  <span>更換照片</span>
-                  <input type="file" accept="image/*" hidden
-                    onChange={e => handleCellImageUpload(selectedCell!, e)} />
+                  <span>更換檔案</span>
+                  <input type="file" accept="image/*,video/*" hidden
+                    onChange={e => handleCellMediaUpload(selectedCell!, e)} />
                 </label>
               </>
             ) : (

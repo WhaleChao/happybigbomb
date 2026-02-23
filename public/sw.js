@@ -1,15 +1,6 @@
-const CACHE_NAME = 'xiaopidalili-v1';
-const urlsToCache = [
-    './',
-    './index.html',
-    './icon-192.png',
-    './icon-512.png',
-];
+const CACHE_NAME = 'xiaopidalili-v2';
 
-self.addEventListener('install', (event) => {
-    event.waitUntil(
-        caches.open(CACHE_NAME).then((cache) => cache.addAll(urlsToCache))
-    );
+self.addEventListener('install', () => {
     self.skipWaiting();
 });
 
@@ -22,8 +13,18 @@ self.addEventListener('activate', (event) => {
     self.clients.claim();
 });
 
+// Network-first strategy: always try network, fallback to cache
 self.addEventListener('fetch', (event) => {
     event.respondWith(
-        caches.match(event.request).then((response) => response || fetch(event.request))
+        fetch(event.request)
+            .then((response) => {
+                // Cache successful responses
+                if (response.ok) {
+                    const clone = response.clone();
+                    caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+                }
+                return response;
+            })
+            .catch(() => caches.match(event.request))
     );
 });
