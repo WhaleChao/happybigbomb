@@ -434,8 +434,9 @@ function App() {
 
     const gridEl = gridRef.current;
     const gridRect = gridEl.getBoundingClientRect();
-    const cw = Math.round(gridRect.width);
-    const ch = Math.round(gridRect.height);
+    const exportScale = 2; // Double resolution for higher quality exports
+    const cw = Math.round(gridRect.width * exportScale);
+    const ch = Math.round(gridRect.height * exportScale);
 
     const canvas = document.createElement('canvas');
     canvas.width = cw;
@@ -464,13 +465,13 @@ function App() {
       cellEls.forEach((cellEl, i) => {
         const cell = cells[i];
         const cellRect = cellEl.getBoundingClientRect();
-        const dx = (cellRect.left - gridRect.left);
-        const dy = (cellRect.top - gridRect.top);
-        const dw = cellRect.width;
-        const dh = cellRect.height;
+        const dx = (cellRect.left - gridRect.left) * exportScale;
+        const dy = (cellRect.top - gridRect.top) * exportScale;
+        const dw = cellRect.width * exportScale;
+        const dh = cellRect.height * exportScale;
 
         ctx.save();
-        const r = borderRadius;
+        const r = borderRadius * exportScale;
         ctx.beginPath();
         ctx.roundRect(dx, dy, dw, dh, r);
         ctx.clip();
@@ -566,8 +567,8 @@ function App() {
 
       // Wait for all videos to seek
       if (seekPromises.length > 0) {
-        // Add a small timeout to perfectly resolve frozen videos
-        await Promise.race([Promise.all(seekPromises), new Promise(r => setTimeout(r, 200))]);
+        // Add a generous timeout to allow high-res videos to decode without dropping frames
+        await Promise.race([Promise.all(seekPromises), new Promise(r => setTimeout(r, 1000))]);
       }
 
       drawFrame();
