@@ -291,13 +291,15 @@ function App() {
   };
 
   // --- Export ---
+  const hasVideo = cells.some(c => c.mediaType === 'video' && c.imageUrl);
+
   const exportAsPng = useCallback(async () => {
     if (!gridRef.current) return;
 
     const { default: html2canvas } = await import('html2canvas');
     const canvas = await html2canvas(gridRef.current, {
       backgroundColor: bgColor,
-      scale: 2, // High-res export
+      scale: 2,
       useCORS: true,
       logging: false,
     });
@@ -308,62 +310,119 @@ function App() {
     link.click();
   }, [bgColor]);
 
-  // --- Check if any cell has video ---
-  const hasVideo = cells.some(c => c.mediaType === 'video' && c.imageUrl);
+  // --- Export as Video (canvas compositing for real video frames) ---
+  const [isRecording, setIsRecording] = useState(false);
 
-  // --- Export as MP4 ---
-  const exportAsMp4 = useCallback(async () => {
-    if (!gridRef.current) return;
-    const el = gridRef.current;
-    const rect = el.getBoundingClientRect();
+  const exportAsVideo = useCallback(async () => {
+    if (!gridRef.current || isRecording) return;
+    setIsRecording(true);
+
+    const gridEl = gridRef.current;
+    const gridRect = gridEl.getBoundingClientRect();
     const scale = 2;
-    const w = Math.round(rect.width * scale);
-    const h = Math.round(rect.height * scale);
+    const cw = Math.round(gridRect.width * scale);
+    const ch = Math.round(gridRect.height * scale);
 
     const canvas = document.createElement('canvas');
-    canvas.width = w;
-    canvas.height = h;
+    canvas.width = cw;
+    canvas.height = ch;
     const ctx = canvas.getContext('2d')!;
 
-    // Use html2canvas to render frames
-    const { default: html2canvas } = await import('html2canvas');
+    // Determine recording duration from longest video, capped at 10s
+    const videoEls = Array.from(gridEl.querySelectorAll('video'));
+    let maxDur = 3;
+    videoEls.forEach(v => {
+      if (v.duration && isFinite(v.duration)) maxDur = Math.max(maxDur, v.duration);
+    });
+    maxDur = Math.min(maxDur, 10);
 
+    // Reset all videos to start
+    videoEls.forEach(v => { v.currentTime = 0; v.play(); });
+
+    // Setup MediaRecorder
     const stream = canvas.captureStream(30);
-    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9' });
+    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+      ? 'video/webm;codecs=vp9'
+      : MediaRecorder.isTypeSupported('video/webm')
+        ? 'video/webm'
+        : 'video/mp4';
+    const recorder = new MediaRecorder(stream, { mimeType });
     const chunks: Blob[] = [];
-    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
 
+    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
     recorder.onstop = () => {
-      const blob = new Blob(chunks, { type: 'video/webm' });
+      const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
+      const blob = new Blob(chunks, { type: mimeType });
       const link = document.createElement('a');
-      link.download = `story-grid-${Date.now()}.webm`;
+      link.download = `story-grid-${Date.now()}.${ext}`;
       link.href = URL.createObjectURL(blob);
       link.click();
       URL.revokeObjectURL(link.href);
+      setIsRecording(false);
+    };
+
+    const cellEls = gridEl.querySelectorAll('.grid-cell');
+
+    // Draw one frame by compositing all cells onto the canvas
+    const drawFrame = () => {
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, cw, ch);
+
+      cellEls.forEach((cellEl) => {
+        const cellRect = cellEl.getBoundingClientRect();
+        const dx = (cellRect.left - gridRect.left) * scale;
+        const dy = (cellRect.top - gridRect.top) * scale;
+        const dw = cellRect.width * scale;
+        const dh = cellRect.height * scale;
+
+        const media = cellEl.querySelector('img, video') as HTMLImageElement | HTMLVideoElement | null;
+        if (!media) return;
+
+        // Get natural dimensions
+        const nw = media instanceof HTMLVideoElement ? media.videoWidth : media.naturalWidth;
+        const nh = media instanceof HTMLVideoElement ? media.videoHeight : media.naturalHeight;
+        if (!nw || !nh) return;
+
+        ctx.save();
+
+        // Clip to cell with border-radius
+        const r = borderRadius * scale;
+        ctx.beginPath();
+        ctx.roundRect(dx, dy, dw, dh, r);
+        ctx.clip();
+
+        // Object-fit: cover calculation
+        const cellAR = dw / dh;
+        const mediaAR = nw / nh;
+        let sx: number, sy: number, sw: number, sh: number;
+        if (mediaAR > cellAR) {
+          sh = nh; sw = nh * cellAR;
+          sx = (nw - sw) / 2; sy = 0;
+        } else {
+          sw = nw; sh = nw / cellAR;
+          sx = 0; sy = (nh - sh) / 2;
+        }
+
+        ctx.drawImage(media, sx, sy, sw, sh, dx, dy, dw, dh);
+        ctx.restore();
+      });
     };
 
     recorder.start();
+    const startTime = performance.now();
+    const durationMs = maxDur * 1000;
 
-    // Record for 3 seconds, capturing frames
-    const duration = 3000;
-    const fps = 15;
-    const interval = 1000 / fps;
-    let elapsed = 0;
-
-    const captureFrame = async () => {
-      if (elapsed >= duration) {
+    const animate = () => {
+      if (performance.now() - startTime >= durationMs) {
         recorder.stop();
         return;
       }
-      const frame = await html2canvas(el, { backgroundColor: bgColor, scale, useCORS: true, logging: false });
-      ctx.clearRect(0, 0, w, h);
-      ctx.drawImage(frame, 0, 0, w, h);
-      elapsed += interval;
-      setTimeout(captureFrame, interval);
+      drawFrame();
+      requestAnimationFrame(animate);
     };
+    animate();
+  }, [bgColor, borderRadius, isRecording]);
 
-    captureFrame();
-  }, [bgColor]);
 
   const selected = selectedCell !== null ? cells[selectedCell] : null;
 
@@ -393,9 +452,9 @@ function App() {
               <Trash2 size={16} />
             </button>
             {hasVideo ? (
-              <button className="btn-primary export-btn" onClick={exportAsMp4}>
+              <button className={`btn-primary export-btn ${isRecording ? 'recording' : ''}`} onClick={exportAsVideo} disabled={isRecording}>
                 <Film size={18} />
-                <span>匯出 影片</span>
+                <span>{isRecording ? '錄製中…' : '匯出影片'}</span>
               </button>
             ) : null}
             <button className="btn-primary export-btn" onClick={exportAsPng}>
