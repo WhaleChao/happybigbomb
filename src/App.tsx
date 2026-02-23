@@ -25,7 +25,7 @@ interface CellData {
   id: number;
   imageUrl: string | null;
   objectUrl: string | null;
-  mediaType: 'image' | 'video';
+  mediaType: 'image' | 'video' | 'gif';
   filters: {
     brightness: number;
     contrast: number;
@@ -253,9 +253,11 @@ function App() {
     if (!file) return;
     const objectUrl = URL.createObjectURL(file);
     const isVideo = file.type.startsWith('video/');
+    const isGif = file.type === 'image/gif' || file.name.toLowerCase().endsWith('.gif');
+    const mediaType: 'video' | 'gif' | 'image' = isVideo ? 'video' : isGif ? 'gif' : 'image';
     setCells(prev => prev.map(c =>
       c.id === cellId
-        ? { ...c, imageUrl: objectUrl, objectUrl: objectUrl, mediaType: isVideo ? 'video' as const : 'image' as const }
+        ? { ...c, imageUrl: objectUrl, objectUrl: objectUrl, mediaType }
         : c
     ));
   };
@@ -291,17 +293,21 @@ function App() {
   };
 
   // --- Export ---
-  const hasVideo = cells.some(c => c.mediaType === 'video' && c.imageUrl);
+  const hasAnimated = cells.some(c => (c.mediaType === 'video' || c.mediaType === 'gif') && c.imageUrl);
 
   const exportAsPng = useCallback(async () => {
     if (!gridRef.current) return;
 
     const { default: html2canvas } = await import('html2canvas');
-    const canvas = await html2canvas(gridRef.current, {
+    const el = gridRef.current;
+    const rect = el.getBoundingClientRect();
+    const canvas = await html2canvas(el, {
       backgroundColor: bgColor,
       scale: 2,
       useCORS: true,
       logging: false,
+      width: rect.width,
+      height: rect.height,
     });
 
     const link = document.createElement('a');
@@ -451,7 +457,7 @@ function App() {
             <button className="btn-icon cache-btn" onClick={clearCache} title="清除快取">
               <Trash2 size={16} />
             </button>
-            {hasVideo ? (
+            {hasAnimated ? (
               <button className={`btn-primary export-btn ${isRecording ? 'recording' : ''}`} onClick={exportAsVideo} disabled={isRecording}>
                 <Film size={18} />
                 <span>{isRecording ? '錄製中…' : '匯出影片'}</span>
@@ -562,12 +568,11 @@ function App() {
                             muted
                             playsInline
                             style={{
+                              display: 'block',
                               width: '100%',
                               height: '100%',
                               objectFit: cell.objectFit,
-                              filter: getFilterString(cell.filters),
                               transform: `scale(${cell.scale / 100}) translate(${cell.offsetX}px, ${cell.offsetY}px)`,
-                              transition: 'filter 0.3s ease',
                             }}
                           />
                         ) : (
