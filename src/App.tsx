@@ -342,120 +342,116 @@ function App() {
     link.click();
   }, [bgColor]);
 
-  // --- Export as Video (canvas compositing for real video frames) ---
+  // --- Export as GIF (infinite loop) ---
   const [isRecording, setIsRecording] = useState(false);
 
-  const exportAsVideo = useCallback(async () => {
+  const exportAsGif = useCallback(async () => {
     if (!gridRef.current || isRecording) return;
     setIsRecording(true);
 
+    const { GIFEncoder, quantize, applyPalette } = await import('gifenc');
+
     const gridEl = gridRef.current;
     const gridRect = gridEl.getBoundingClientRect();
-    const scale = 1; // Use 1x for smooth recording
-    const cw = Math.round(gridRect.width * scale);
-    const ch = Math.round(gridRect.height * scale);
+    const cw = Math.round(gridRect.width);
+    const ch = Math.round(gridRect.height);
 
     const canvas = document.createElement('canvas');
     canvas.width = cw;
     canvas.height = ch;
     const ctx = canvas.getContext('2d')!;
 
-    // Use stored durations from cells, capped at 30s
+    // Duration from stored cell data
     let maxDur = 3;
     cells.forEach(c => {
       if ((c.mediaType === 'video' || c.mediaType === 'gif') && c.duration > 0) {
         maxDur = Math.max(maxDur, c.duration);
       }
     });
-    maxDur = Math.min(maxDur, 30);
+    maxDur = Math.min(maxDur, 15); // cap at 15s for GIF file size
 
     // Reset all videos to start
     const videoEls = Array.from(gridEl.querySelectorAll('video')) as HTMLVideoElement[];
     videoEls.forEach(v => { v.currentTime = 0; v.play(); });
 
-    // Setup MediaRecorder
-    const stream = canvas.captureStream(30);
-    const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
-      ? 'video/webm;codecs=vp9'
-      : MediaRecorder.isTypeSupported('video/webm')
-        ? 'video/webm'
-        : 'video/mp4';
-    const recorder = new MediaRecorder(stream, { mimeType });
-    const chunks: Blob[] = [];
-
-    recorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
-    recorder.onstop = () => {
-      const ext = mimeType.includes('mp4') ? 'mp4' : 'webm';
-      const blob = new Blob(chunks, { type: mimeType });
-      const link = document.createElement('a');
-      link.download = `story-grid-${Date.now()}.${ext}`;
-      link.href = URL.createObjectURL(blob);
-      link.click();
-      URL.revokeObjectURL(link.href);
-      setIsRecording(false);
-    };
-
     const cellEls = gridEl.querySelectorAll('.grid-cell');
 
-    // Draw one frame by compositing all cells onto the canvas
+    // Draw one frame
     const drawFrame = () => {
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, cw, ch);
 
       cellEls.forEach((cellEl) => {
         const cellRect = cellEl.getBoundingClientRect();
-        const dx = (cellRect.left - gridRect.left) * scale;
-        const dy = (cellRect.top - gridRect.top) * scale;
-        const dw = cellRect.width * scale;
-        const dh = cellRect.height * scale;
+        const dx = (cellRect.left - gridRect.left);
+        const dy = (cellRect.top - gridRect.top);
+        const dw = cellRect.width;
+        const dh = cellRect.height;
 
         const media = cellEl.querySelector('img, video') as HTMLImageElement | HTMLVideoElement | null;
         if (!media) return;
 
-        // Get natural dimensions
         const nw = media instanceof HTMLVideoElement ? media.videoWidth : media.naturalWidth;
         const nh = media instanceof HTMLVideoElement ? media.videoHeight : media.naturalHeight;
         if (!nw || !nh) return;
 
         ctx.save();
-
-        // Clip to cell with border-radius
-        const r = borderRadius * scale;
+        const r = borderRadius;
         ctx.beginPath();
         ctx.roundRect(dx, dy, dw, dh, r);
         ctx.clip();
 
-        // Object-fit: cover calculation
+        // Object-fit: cover
         const cellAR = dw / dh;
         const mediaAR = nw / nh;
         let sx: number, sy: number, sw: number, sh: number;
         if (mediaAR > cellAR) {
-          sh = nh; sw = nh * cellAR;
-          sx = (nw - sw) / 2; sy = 0;
+          sh = nh; sw = nh * cellAR; sx = (nw - sw) / 2; sy = 0;
         } else {
-          sw = nw; sh = nw / cellAR;
-          sx = 0; sy = (nh - sh) / 2;
+          sw = nw; sh = nw / cellAR; sx = 0; sy = (nh - sh) / 2;
         }
-
         ctx.drawImage(media, sx, sy, sw, sh, dx, dy, dw, dh);
         ctx.restore();
       });
     };
 
-    recorder.start();
-    const startTime = performance.now();
-    const durationMs = maxDur * 1000;
+    // Capture frames
+    const fps = 10;
+    const delay = 1000 / fps;
+    const totalFrames = Math.round(maxDur * fps);
+    const gif = GIFEncoder();
 
-    const animate = () => {
-      if (performance.now() - startTime >= durationMs) {
-        recorder.stop();
+    let frameCount = 0;
+    const captureNextFrame = () => {
+      if (frameCount >= totalFrames) {
+        // Finish and download
+        gif.finish();
+        const output = gif.bytes();
+        const blob = new Blob([output], { type: 'image/gif' });
+        const link = document.createElement('a');
+        link.download = `story-grid-${Date.now()}.gif`;
+        link.href = URL.createObjectURL(blob);
+        link.click();
+        URL.revokeObjectURL(link.href);
+        setIsRecording(false);
         return;
       }
+
       drawFrame();
-      requestAnimationFrame(animate);
+      const imageData = ctx.getImageData(0, 0, cw, ch);
+      const palette = quantize(imageData.data, 256);
+      const index = applyPalette(imageData.data, palette);
+      gif.writeFrame(index, cw, ch, { palette, delay: Math.round(delay), repeat: 0 });
+
+      frameCount++;
+      // Use setTimeout to allow video to advance between frames
+      setTimeout(() => requestAnimationFrame(captureNextFrame), delay);
     };
-    animate();
+
+    // Wait a moment for videos to start playing, then begin capture
+    setTimeout(() => requestAnimationFrame(captureNextFrame), 200);
   }, [bgColor, borderRadius, isRecording, cells]);
+
 
 
   const selected = selectedCell !== null ? cells[selectedCell] : null;
@@ -486,9 +482,9 @@ function App() {
               <Trash2 size={16} />
             </button>
             {hasAnimated ? (
-              <button className={`btn-primary export-btn ${isRecording ? 'recording' : ''}`} onClick={exportAsVideo} disabled={isRecording}>
+              <button className={`btn-primary export-btn ${isRecording ? 'recording' : ''}`} onClick={exportAsGif} disabled={isRecording}>
                 <Film size={18} />
-                <span>{isRecording ? '錄製中…' : '匯出影片'}</span>
+                <span>{isRecording ? '製作中…' : '匯出 GIF'}</span>
               </button>
             ) : null}
             <button className="btn-primary export-btn" onClick={exportAsPng}>
