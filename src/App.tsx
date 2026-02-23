@@ -27,6 +27,7 @@ interface CellData {
   objectUrl: string | null;
   mediaType: 'image' | 'video' | 'gif';
   duration: number; // seconds, 0 for static images
+  gifFrames?: { canvas: HTMLCanvasElement, delay: number }[];
   filters: {
     brightness: number;
     contrast: number;
@@ -279,13 +280,73 @@ function App() {
           ? { ...c, imageUrl: objectUrl, objectUrl, mediaType, duration: 5 }
           : c
       ));
+    } else if (isGif) {
+      // Async parse GIF frames
+      file.arrayBuffer().then(buffer => {
+        import('gifuct-js').then(({ parseGIF, decompressFrames }) => {
+          try {
+            const gif = parseGIF(buffer);
+            const frames = decompressFrames(gif, true);
+
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d')!;
+            canvas.width = gif.lsd.width;
+            canvas.height = gif.lsd.height;
+
+            const tmpCanvas = document.createElement('canvas');
+            const tCtx = tmpCanvas.getContext('2d')!;
+
+            const currentFrames: { canvas: HTMLCanvasElement, delay: number }[] = [];
+            let previousImageData: ImageData | null = null;
+
+            frames.forEach((frame, i) => {
+              if (i > 0 && frames[i - 1].disposalType === 2) {
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+              } else if (i > 0 && frames[i - 1].disposalType === 3 && previousImageData) {
+                ctx.putImageData(previousImageData, 0, 0);
+              }
+
+              if (frame.disposalType === 3) {
+                previousImageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              }
+
+              tmpCanvas.width = frame.dims.width;
+              tmpCanvas.height = frame.dims.height;
+              const frameImageData = tCtx.createImageData(frame.dims.width, frame.dims.height);
+              frameImageData.data.set(frame.patch);
+              tCtx.putImageData(frameImageData, 0, 0);
+
+              ctx.drawImage(tmpCanvas, 0, 0, frame.dims.width, frame.dims.height, frame.dims.left, frame.dims.top, frame.dims.width, frame.dims.height);
+
+              const resultCanvas = document.createElement('canvas');
+              resultCanvas.width = canvas.width;
+              resultCanvas.height = canvas.height;
+              resultCanvas.getContext('2d')!.drawImage(canvas, 0, 0);
+
+              currentFrames.push({ canvas: resultCanvas, delay: frame.delay || 100 });
+            });
+
+            const totalDuration = currentFrames.reduce((acc, f) => acc + f.delay, 0) / 1000;
+
+            setCells(prev => prev.map(c =>
+              c.id === cellId
+                ? { ...c, imageUrl: objectUrl, objectUrl, mediaType, duration: totalDuration, gifFrames: currentFrames }
+                : c
+            ));
+          } catch (e) {
+            console.error("GIF parse error", e);
+            setCells(prev => prev.map(c => c.id === cellId ? { ...c, imageUrl: objectUrl, objectUrl, mediaType, duration: 3 } : c));
+          }
+        });
+      });
     } else {
       setCells(prev => prev.map(c =>
         c.id === cellId
-          ? { ...c, imageUrl: objectUrl, objectUrl, mediaType, duration: isGif ? 6 : 0 }
+          ? { ...c, imageUrl: objectUrl, objectUrl, mediaType, duration: 0 }
           : c
       ));
     }
+
   };
 
   const updateCellFilter = (cellId: number, key: keyof CellData['filters'], value: number) => {
@@ -400,25 +461,62 @@ function App() {
       ctx.fillStyle = bgColor;
       ctx.fillRect(0, 0, cw, ch);
 
-      cellEls.forEach((cellEl) => {
+      cellEls.forEach((cellEl, i) => {
+        const cell = cells[i];
         const cellRect = cellEl.getBoundingClientRect();
         const dx = (cellRect.left - gridRect.left);
         const dy = (cellRect.top - gridRect.top);
         const dw = cellRect.width;
         const dh = cellRect.height;
 
-        const media = cellEl.querySelector('img, video') as HTMLImageElement | HTMLVideoElement | null;
-        if (!media) return;
-
-        const nw = media instanceof HTMLVideoElement ? media.videoWidth : media.naturalWidth;
-        const nh = media instanceof HTMLVideoElement ? media.videoHeight : media.naturalHeight;
-        if (!nw || !nh) return;
-
         ctx.save();
         const r = borderRadius;
         ctx.beginPath();
         ctx.roundRect(dx, dy, dw, dh, r);
         ctx.clip();
+
+        // If it's a parsed GIF, use the exact frame for the current time
+        if (cell.mediaType === 'gif' && cell.gifFrames && cell.gifFrames.length > 0) {
+          const elapsed = frameCount * delayMs;
+          const loopTime = elapsed % (cell.duration * 1000);
+          let timeSum = 0;
+          let currentCanvas = cell.gifFrames[0].canvas;
+          for (const f of cell.gifFrames) {
+            timeSum += f.delay;
+            if (timeSum >= loopTime) {
+              currentCanvas = f.canvas;
+              break;
+            }
+          }
+
+          const nw = currentCanvas.width;
+          const nh = currentCanvas.height;
+          const cellAR = dw / dh;
+          const mediaAR = nw / nh;
+          let sx: number, sy: number, sw: number, sh: number;
+          if (mediaAR > cellAR) {
+            sh = nh; sw = nh * cellAR; sx = (nw - sw) / 2; sy = 0;
+          } else {
+            sw = nw; sh = nw / cellAR; sx = 0; sy = (nh - sh) / 2;
+          }
+          ctx.drawImage(currentCanvas, sx, sy, sw, sh, dx, dy, dw, dh);
+          ctx.restore();
+          return; // Done with this cell
+        }
+
+        // Normal image/video logic
+        const media = cellEl.querySelector('img, video') as HTMLImageElement | HTMLVideoElement | null;
+        if (!media) {
+          ctx.restore();
+          return;
+        }
+
+        const nw = media instanceof HTMLVideoElement ? media.videoWidth : media.naturalWidth;
+        const nh = media instanceof HTMLVideoElement ? media.videoHeight : media.naturalHeight;
+        if (!nw || !nh) {
+          ctx.restore();
+          return;
+        }
 
         const cellAR = dw / dh;
         const mediaAR = nw / nh;
