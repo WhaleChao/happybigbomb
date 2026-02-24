@@ -381,6 +381,7 @@ function App() {
 
   // --- Export ---
   const hasAnimated = cells.some(c => (c.mediaType === 'video' || c.mediaType === 'gif') && c.imageUrl);
+  const hasVideo = cells.some(c => c.mediaType === 'video' && c.imageUrl);
 
   // --- Download helper (works on mobile Safari too) ---
   const downloadBlob = useCallback(async (blob: Blob, filename: string) => {
@@ -594,6 +595,195 @@ function App() {
     requestAnimationFrame(captureNextFrame);
   }, [bgColor, borderRadius, isRecording, cells, downloadBlob]);
 
+  // --- Export as MP4 ---
+  const exportAsMp4 = useCallback(async () => {
+    if (!gridRef.current || isRecording) return;
+    setIsRecording(true);
+
+    try {
+      const { Muxer, ArrayBufferTarget } = await import('mp4-muxer');
+
+      if (!('VideoEncoder' in window)) {
+        alert('您的瀏覽器不支援影片編碼 (WebCodecs API)，請使用最新版 Chrome 或 Edge。');
+        setIsRecording(false);
+        return;
+      }
+
+      const gridEl = gridRef.current;
+      const gridRect = gridEl.getBoundingClientRect();
+      const exportScale = 2;
+      // Ensure even dimensions for video codecs
+      const cw = Math.round(gridRect.width * exportScale) & ~1;
+      const ch = Math.round(gridRect.height * exportScale) & ~1;
+
+      const canvas = document.createElement('canvas');
+      canvas.width = cw;
+      canvas.height = ch;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+
+      let maxDur = 3;
+      cells.forEach(c => {
+        if ((c.mediaType === 'video' || c.mediaType === 'gif') && c.duration > 0) {
+          maxDur = Math.max(maxDur, c.duration);
+        }
+      });
+      maxDur = Math.min(maxDur, 15);
+
+      const videoEls = Array.from(gridEl.querySelectorAll('video')) as HTMLVideoElement[];
+      videoEls.forEach(v => { v.pause(); v.currentTime = 0; });
+      const cellEls = gridEl.querySelectorAll('.grid-cell');
+
+      const drawFrame = () => {
+        ctx.fillStyle = bgColor;
+        ctx.fillRect(0, 0, cw, ch);
+
+        cellEls.forEach((cellEl, i) => {
+          const cell = cells[i];
+          const cellRect = cellEl.getBoundingClientRect();
+          const dx = (cellRect.left - gridRect.left) * exportScale;
+          const dy = (cellRect.top - gridRect.top) * exportScale;
+          const dw = cellRect.width * exportScale;
+          const dh = cellRect.height * exportScale;
+
+          ctx.save();
+          const r = borderRadius * exportScale;
+          ctx.beginPath();
+          ctx.roundRect(dx, dy, dw, dh, r);
+          ctx.clip();
+
+          if (cell.mediaType === 'gif' && cell.gifFrames && cell.gifFrames.length > 0) {
+            const elapsed = frameCount * delayMs;
+            const loopTime = elapsed % (cell.duration * 1000);
+            let timeSum = 0;
+            let currentCanvas = cell.gifFrames[0].canvas;
+            for (const f of cell.gifFrames) {
+              timeSum += f.delay;
+              if (timeSum >= loopTime) {
+                currentCanvas = f.canvas;
+                break;
+              }
+            }
+
+            const nw = currentCanvas.width;
+            const nh = currentCanvas.height;
+            const cellAR = dw / dh;
+            const mediaAR = nw / nh;
+            let sx: number, sy: number, sw: number, sh: number;
+            if (mediaAR > cellAR) {
+              sh = nh; sw = nh * cellAR; sx = (nw - sw) / 2; sy = 0;
+            } else {
+              sw = nw; sh = nw / cellAR; sx = 0; sy = (nh - sh) / 2;
+            }
+            ctx.drawImage(currentCanvas, sx, sy, sw, sh, dx, dy, dw, dh);
+            ctx.restore();
+            return;
+          }
+
+          const media = cellEl.querySelector('img, video') as HTMLImageElement | HTMLVideoElement | null;
+          if (!media) {
+            ctx.restore();
+            return;
+          }
+
+          const nw = media instanceof HTMLVideoElement ? media.videoWidth : media.naturalWidth;
+          const nh = media instanceof HTMLVideoElement ? media.videoHeight : media.naturalHeight;
+          if (!nw || !nh) {
+            ctx.restore();
+            return;
+          }
+
+          const cellAR = dw / dh;
+          const mediaAR = nw / nh;
+          let sx: number, sy: number, sw: number, sh: number;
+          if (mediaAR > cellAR) {
+            sh = nh; sw = nh * cellAR; sx = (nw - sw) / 2; sy = 0;
+          } else {
+            sw = nw; sh = nw / cellAR; sx = 0; sy = (nh - sh) / 2;
+          }
+          ctx.drawImage(media, sx, sy, sw, sh, dx, dy, dw, dh);
+          ctx.restore();
+        });
+      };
+
+      const fps = 30; // High framerate for MP4
+      const delayMs = 1000 / fps;
+      const totalFrames = Math.round(maxDur * fps);
+      let frameCount = 0;
+
+      const muxer = new Muxer({
+        target: new ArrayBufferTarget(),
+        video: {
+          codec: 'avc',
+          width: cw,
+          height: ch
+        },
+        fastStart: 'in-memory'
+      });
+
+      const videoEncoder = new window.VideoEncoder({
+        output: (chunk, meta) => muxer.addVideoChunk(chunk, meta),
+        error: e => {
+          console.error(e);
+          alert('影片編碼失敗：' + e.message);
+        }
+      });
+
+      videoEncoder.configure({
+        codec: 'avc1.420028',
+        width: cw,
+        height: ch,
+        bitrate: 5_000_000,
+        framerate: fps
+      });
+
+      const captureNextFrame = async () => {
+        if (frameCount >= totalFrames) {
+          await videoEncoder.flush();
+          muxer.finalize();
+          const buffer = muxer.target.buffer;
+          const blob = new Blob([buffer], { type: 'video/mp4' });
+          downloadBlob(blob, `story-video-${Date.now()}.mp4`);
+          setIsRecording(false);
+          return;
+        }
+
+        const currentTime = frameCount * (delayMs / 1000);
+        const seekPromises = videoEls.map(v => {
+          return new Promise<void>(resolve => {
+            if (v.duration && currentTime > v.duration) return resolve();
+            const onSeeked = () => {
+              v.removeEventListener('seeked', onSeeked);
+              resolve();
+            };
+            v.addEventListener('seeked', onSeeked);
+            v.currentTime = currentTime;
+          });
+        });
+
+        if (seekPromises.length > 0) {
+          await Promise.race([Promise.all(seekPromises), new Promise(r => setTimeout(r, 1000))]);
+        }
+
+        drawFrame();
+
+        // Encode frame using VideoFrame
+        const frame = new window.VideoFrame(canvas, { timestamp: frameCount * 1e6 / fps });
+        videoEncoder.encode(frame, { keyFrame: frameCount % 30 === 0 });
+        frame.close();
+
+        frameCount++;
+        requestAnimationFrame(captureNextFrame);
+      };
+
+      requestAnimationFrame(captureNextFrame);
+
+    } catch (e: any) {
+      console.error(e);
+      alert('匯出影片時發生錯誤：' + e.message);
+      setIsRecording(false);
+    }
+  }, [bgColor, borderRadius, isRecording, cells, downloadBlob]);
+
 
 
   const selected = selectedCell !== null ? cells[selectedCell] : null;
@@ -624,9 +814,9 @@ function App() {
               <Trash2 size={16} />
             </button>
             {hasAnimated ? (
-              <button className={`btn-primary export-btn ${isRecording ? 'recording' : ''}`} onClick={exportAsGif} disabled={isRecording}>
+              <button className={`btn-primary export-btn ${isRecording ? 'recording' : ''}`} onClick={hasVideo ? exportAsMp4 : exportAsGif} disabled={isRecording}>
                 <Film size={18} />
-                <span>{isRecording ? '製作中…' : '匯出 GIF'}</span>
+                <span>{isRecording ? '製作中…' : (hasVideo ? '匯出 MP4' : '匯出 GIF')}</span>
               </button>
             ) : null}
             <button className="btn-primary export-btn" onClick={exportAsPng}>
