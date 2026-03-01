@@ -213,6 +213,58 @@ function getFilterString(f: CellData['filters']): string {
   return `brightness(${f.brightness}%) contrast(${f.contrast}%) saturate(${f.saturate}%) blur(${f.blur}px) grayscale(${f.grayscale}%) sepia(${f.sepia}%)`;
 }
 
+function drawCellMedia_Canvas(
+  ctx: CanvasRenderingContext2D,
+  media: HTMLImageElement | HTMLVideoElement | HTMLCanvasElement,
+  cell: CellData,
+  dx: number, dy: number, dw: number, dh: number,
+  exportScale: number
+) {
+  const nw = 'videoWidth' in media ? media.videoWidth : ('naturalWidth' in media ? media.naturalWidth : media.width);
+  const nh = 'videoHeight' in media ? media.videoHeight : ('naturalHeight' in media ? media.naturalHeight : media.height);
+  if (!nw || !nh) return;
+
+  const cellAR = dw / dh;
+  const mediaAR = nw / nh;
+  let drawW = dw;
+  let drawH = dh;
+
+  if (cell.objectFit === 'cover') {
+    if (mediaAR > cellAR) {
+      drawW = dh * mediaAR;
+    } else {
+      drawH = dw / mediaAR;
+    }
+  } else {
+    // contain
+    if (mediaAR > cellAR) {
+      drawH = dw / mediaAR;
+    } else {
+      drawW = dh * mediaAR;
+    }
+  }
+
+  const drawX = dx + (dw - drawW) / 2;
+  const drawY = dy + (dh - drawH) / 2;
+
+  ctx.save();
+
+  // Apply Filter
+  const f = cell.filters;
+  ctx.filter = `brightness(${f.brightness}%) contrast(${f.contrast}%) saturate(${f.saturate}%) blur(${f.blur * exportScale}px) grayscale(${f.grayscale}%) sepia(${f.sepia}%)`;
+
+  // Apply Transform
+  const cx = dx + dw / 2;
+  const cy = dy + dh / 2;
+  ctx.translate(cx, cy);
+  ctx.scale(cell.scale / 100, cell.scale / 100);
+  ctx.translate(cell.offsetX * exportScale, cell.offsetY * exportScale);
+  ctx.translate(-cx, -cy);
+
+  ctx.drawImage(media, drawX, drawY, drawW, drawH);
+  ctx.restore();
+}
+
 // --- Main App ---
 function App() {
   const [layoutIndex, setLayoutIndex] = useState(2); // Default: 4-grid
@@ -226,6 +278,8 @@ function App() {
 
   const currentAspectRatio = ASPECT_RATIOS[aspectRatioIndex];
   const isLandscape = currentAspectRatio.w > currentAspectRatio.h;
+
+  const [dragState, setDragState] = useState<{ id: number, startX: number, startY: number, initOffsetX: number, initOffsetY: number, isDragging: boolean } | null>(null);
 
   const layout = LAYOUTS[layoutIndex];
 
@@ -491,17 +545,7 @@ function App() {
             }
           }
 
-          const nw = currentCanvas.width;
-          const nh = currentCanvas.height;
-          const cellAR = dw / dh;
-          const mediaAR = nw / nh;
-          let sx: number, sy: number, sw: number, sh: number;
-          if (mediaAR > cellAR) {
-            sh = nh; sw = nh * cellAR; sx = (nw - sw) / 2; sy = 0;
-          } else {
-            sw = nw; sh = nw / cellAR; sx = 0; sy = (nh - sh) / 2;
-          }
-          ctx.drawImage(currentCanvas, sx, sy, sw, sh, dx, dy, dw, dh);
+          drawCellMedia_Canvas(ctx, currentCanvas, cell, dx, dy, dw, dh, exportScale);
           ctx.restore();
           return; // Done with this cell
         }
@@ -513,22 +557,7 @@ function App() {
           return;
         }
 
-        const nw = media instanceof HTMLVideoElement ? media.videoWidth : media.naturalWidth;
-        const nh = media instanceof HTMLVideoElement ? media.videoHeight : media.naturalHeight;
-        if (!nw || !nh) {
-          ctx.restore();
-          return;
-        }
-
-        const cellAR = dw / dh;
-        const mediaAR = nw / nh;
-        let sx: number, sy: number, sw: number, sh: number;
-        if (mediaAR > cellAR) {
-          sh = nh; sw = nh * cellAR; sx = (nw - sw) / 2; sy = 0;
-        } else {
-          sw = nw; sh = nw / cellAR; sx = 0; sy = (nh - sh) / 2;
-        }
-        ctx.drawImage(media, sx, sy, sw, sh, dx, dy, dw, dh);
+        drawCellMedia_Canvas(ctx, media, cell, dx, dy, dw, dh, exportScale);
         ctx.restore();
       });
     };
@@ -664,17 +693,7 @@ function App() {
               }
             }
 
-            const nw = currentCanvas.width;
-            const nh = currentCanvas.height;
-            const cellAR = dw / dh;
-            const mediaAR = nw / nh;
-            let sx: number, sy: number, sw: number, sh: number;
-            if (mediaAR > cellAR) {
-              sh = nh; sw = nh * cellAR; sx = (nw - sw) / 2; sy = 0;
-            } else {
-              sw = nw; sh = nw / cellAR; sx = 0; sy = (nh - sh) / 2;
-            }
-            ctx.drawImage(currentCanvas, sx, sy, sw, sh, dx, dy, dw, dh);
+            drawCellMedia_Canvas(ctx, currentCanvas, cell, dx, dy, dw, dh, exportScale);
             ctx.restore();
             return;
           }
@@ -685,22 +704,7 @@ function App() {
             return;
           }
 
-          const nw = media instanceof HTMLVideoElement ? media.videoWidth : media.naturalWidth;
-          const nh = media instanceof HTMLVideoElement ? media.videoHeight : media.naturalHeight;
-          if (!nw || !nh) {
-            ctx.restore();
-            return;
-          }
-
-          const cellAR = dw / dh;
-          const mediaAR = nw / nh;
-          let sx: number, sy: number, sw: number, sh: number;
-          if (mediaAR > cellAR) {
-            sh = nh; sw = nh * cellAR; sx = (nw - sw) / 2; sy = 0;
-          } else {
-            sw = nw; sh = nw / cellAR; sx = 0; sy = (nh - sh) / 2;
-          }
-          ctx.drawImage(media, sx, sy, sw, sh, dx, dy, dw, dh);
+          drawCellMedia_Canvas(ctx, media, cell, dx, dy, dw, dh, exportScale);
           ctx.restore();
         });
       };
@@ -911,9 +915,46 @@ function App() {
                         borderRadius: `${borderRadius}px`,
                         overflow: 'hidden',
                         position: 'relative',
-                        cursor: 'pointer',
+                        cursor: 'grab',
+                        touchAction: 'none',
                       }}
-                      onClick={() => setSelectedCell(i)}
+                      onPointerDown={(e) => {
+                        setSelectedCell(i);
+                        if (!cell.imageUrl) return;
+                        e.currentTarget.setPointerCapture(e.pointerId);
+                        setDragState({
+                          id: i,
+                          startX: e.clientX,
+                          startY: e.clientY,
+                          initOffsetX: cell.offsetX,
+                          initOffsetY: cell.offsetY,
+                          isDragging: false
+                        });
+                      }}
+                      onPointerMove={(e) => {
+                        if (dragState && dragState.id === i) {
+                          const dx = e.clientX - dragState.startX;
+                          const dy = e.clientY - dragState.startY;
+                          if (!dragState.isDragging && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+                            setDragState(prev => prev ? { ...prev, isDragging: true } : prev);
+                          }
+                          if (dragState.isDragging) {
+                            // Scale down delta by the zoom factor so it feels 1:1
+                            const adjDx = dx / (cell.scale / 100);
+                            const adjDy = dy / (cell.scale / 100);
+                            updateCellProp(i, 'offsetX', dragState.initOffsetX + adjDx);
+                            updateCellProp(i, 'offsetY', dragState.initOffsetY + adjDy);
+                          }
+                        }
+                      }}
+                      onPointerUp={(e) => {
+                        e.currentTarget.releasePointerCapture(e.pointerId);
+                        setDragState(null);
+                      }}
+                      onPointerCancel={(e) => {
+                        e.currentTarget.releasePointerCapture(e.pointerId);
+                        setDragState(null);
+                      }}
                     >
                       {cell.imageUrl ? (
                         cell.mediaType === 'video' ? (
@@ -941,7 +982,7 @@ function App() {
                               objectFit: cell.objectFit,
                               filter: getFilterString(cell.filters),
                               transform: `scale(${cell.scale / 100}) translate(${cell.offsetX}px, ${cell.offsetY}px)`,
-                              transition: 'filter 0.3s ease',
+                              transition: dragState?.isDragging && dragState?.id === i ? 'none' : 'transform 0.1s ease, filter 0.3s ease',
                             }}
                             draggable={false}
                           />
