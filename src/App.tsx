@@ -40,6 +40,7 @@ interface CellData {
   scale: number;
   offsetX: number;
   offsetY: number;
+  mediaAR?: number;
 }
 
 interface LayoutTemplate {
@@ -418,11 +419,8 @@ function App() {
       const img = new Image();
       img.onload = () => {
         const mediaAR = img.naturalWidth / img.naturalHeight;
-        const cell = cells.find(c => c.id === cellId);
-
         // Calculate cell aspect ratio based on layout (simplification: assume uniform cells for ratios)
         // A more accurate approach would measure the actual DOM element, but we can approximate:
-        const isLandscape = currentAspectRatio.w > currentAspectRatio.h;
         const layoutRatios = {
           1: { w: currentAspectRatio.w, h: currentAspectRatio.h },
           2: { w: currentAspectRatio.w, h: currentAspectRatio.h / 2 }, // 2 horizontal
@@ -449,7 +447,7 @@ function App() {
 
         setCells(prev => prev.map(c =>
           c.id === cellId
-            ? { ...c, imageUrl: objectUrl, objectUrl, mediaType, duration: 0, scale: initialScale, offsetX: 0, offsetY: 0 }
+            ? { ...c, imageUrl: objectUrl, objectUrl, mediaType, duration: 0, scale: initialScale, offsetX: 0, offsetY: 0, mediaAR: mediaAR }
             : c
         ));
       };
@@ -1072,8 +1070,19 @@ function App() {
                         }
                       }}
                     >
-                      {cell.imageUrl ? (
-                        cell.mediaType === 'video' ? (
+                      {cell.imageUrl ? (() => {
+                        const layoutRatios = {
+                          1: { w: currentAspectRatio.w, h: currentAspectRatio.h },
+                          2: { w: currentAspectRatio.w, h: currentAspectRatio.h / 2 },
+                          3: { w: currentAspectRatio.w / 2, h: currentAspectRatio.h / 2 },
+                        };
+                        const cellRatio = layoutIndex === 0 ? layoutRatios[1] : layoutIndex === 1 ? layoutRatios[2] : layoutRatios[3];
+                        const cellAR = cellRatio.w / cellRatio.h;
+
+                        const mAR = cell.mediaAR || 1;
+                        const isWider = mAR > cellAR;
+
+                        return cell.mediaType === 'video' ? (
                           <div style={{
                             position: 'absolute',
                             width: '100%', height: '100%',
@@ -1087,10 +1096,8 @@ function App() {
                               playsInline
                               style={{
                                 position: 'absolute',
-                                minWidth: cell.objectFit === 'cover' ? '100%' : 'auto',
-                                minHeight: cell.objectFit === 'cover' ? '100%' : 'auto',
-                                maxWidth: cell.objectFit === 'contain' ? '100%' : 'none',
-                                maxHeight: cell.objectFit === 'contain' ? '100%' : 'none',
+                                width: isWider ? 'auto' : '100%',
+                                height: isWider ? '100%' : 'auto',
                                 transform: `translate(${cell.offsetX}px, ${cell.offsetY}px) scale(${cell.scale / 100})`,
                               }}
                             />
@@ -1106,10 +1113,8 @@ function App() {
                               alt=""
                               style={{
                                 position: 'absolute',
-                                minWidth: cell.objectFit === 'cover' ? '100%' : 'auto',
-                                minHeight: cell.objectFit === 'cover' ? '100%' : 'auto',
-                                maxWidth: cell.objectFit === 'contain' ? '100%' : 'none',
-                                maxHeight: cell.objectFit === 'contain' ? '100%' : 'none',
+                                width: isWider ? 'auto' : '100%',
+                                height: isWider ? '100%' : 'auto',
                                 filter: getFilterString(cell.filters),
                                 transform: `translate(${cell.offsetX}px, ${cell.offsetY}px) scale(${cell.scale / 100})`,
                                 transition: dragState?.isDragging && dragState?.id === i ? 'none' : 'transform 0.1s ease, filter 0.3s ease',
@@ -1118,7 +1123,7 @@ function App() {
                             />
                           </div>
                         )
-                      ) : (
+                      })() : (
                         <label className="cell-upload">
                           <ImageIcon size={28} />
                           <span>點擊上傳</span>
