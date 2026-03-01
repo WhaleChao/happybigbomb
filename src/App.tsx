@@ -220,8 +220,18 @@ function drawCellMedia_Canvas(
   dx: number, dy: number, dw: number, dh: number,
   exportScale: number
 ) {
-  const nw = 'videoWidth' in media ? media.videoWidth : ('naturalWidth' in media ? media.naturalWidth : media.width);
-  const nh = 'videoHeight' in media ? media.videoHeight : ('naturalHeight' in media ? media.naturalHeight : media.height);
+  let nw = 0, nh = 0;
+  if (media instanceof HTMLVideoElement) {
+    nw = media.videoWidth;
+    nh = media.videoHeight;
+  } else if (media instanceof HTMLImageElement) {
+    nw = media.naturalWidth;
+    nh = media.naturalHeight;
+  } else if (media instanceof HTMLCanvasElement) {
+    nw = media.width;
+    nh = media.height;
+  }
+
   if (!nw || !nh) return;
 
   const cellAR = dw / dh;
