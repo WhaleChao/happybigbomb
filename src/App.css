@@ -554,11 +554,10 @@ input[type="range"] {
     display: none;
     box-sizing: border-box;
     width: 100%;
-    height: 55%;
-    /* Changed from 100% to 55% to leave canvas visible */
+    height: 100%;
+    /* Changed back to 100% per user request */
     position: absolute;
     bottom: 0;
-    /* Changed from top:0 to bottom:0 */
     left: 0;
     z-index: 20;
     padding: 12px;
@@ -582,8 +581,8 @@ input[type="range"] {
   .canvas-area {
     padding: 8px;
     width: 100%;
-    height: 45%;
-    /* Shrink canvas area when sidebars are open? Well, we want canvas always visible underneath. Let it take 100% and sidebar overlaps. */
+    height: 100%;
+    /* Reverted block back to 100% */
     position: absolute;
     top: 0;
     left: 0;

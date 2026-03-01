@@ -289,7 +289,17 @@ function App() {
   const currentAspectRatio = ASPECT_RATIOS[aspectRatioIndex];
   const isLandscape = currentAspectRatio.w > currentAspectRatio.h;
 
-  const [dragState, setDragState] = useState<{ id: number, startX: number, startY: number, initOffsetX: number, initOffsetY: number, isDragging: boolean } | null>(null);
+  const [dragState, setDragState] = useState<{
+    id: number,
+    startX: number,
+    startY: number,
+    initOffsetX: number,
+    initOffsetY: number,
+    initPinchDist: number | null,
+    initScale: number,
+    isDragging: boolean
+  } | null>(null);
+  const activePointers = useRef<{ id: number, x: number, y: number }[]>([]);
 
   const layout = LAYOUTS[layoutIndex];
 
@@ -932,26 +942,68 @@ function App() {
                         setSelectedCell(i);
                         if (!cell.imageUrl) return;
                         e.currentTarget.setPointerCapture(e.pointerId);
+
+                        const newPointers = [...activePointers.current, { id: e.pointerId, x: e.clientX, y: e.clientY }];
+                        activePointers.current = newPointers;
+
+                        let initPinchDist: number | null = null;
+                        if (newPointers.length === 2) {
+                          const dx = newPointers[0].x - newPointers[1].x;
+                          const dy = newPointers[0].y - newPointers[1].y;
+                          initPinchDist = Math.hypot(dx, dy);
+                        }
+
+                        let startX = e.clientX;
+                        let startY = e.clientY;
+                        if (newPointers.length > 0) {
+                          startX = newPointers.reduce((sum, p) => sum + p.x, 0) / newPointers.length;
+                          startY = newPointers.reduce((sum, p) => sum + p.y, 0) / newPointers.length;
+                        }
+
                         setDragState({
                           id: i,
-                          startX: e.clientX,
-                          startY: e.clientY,
+                          startX: startX,
+                          startY: startY,
                           initOffsetX: cell.offsetX,
                           initOffsetY: cell.offsetY,
+                          initPinchDist,
+                          initScale: cell.scale,
                           isDragging: false
                         });
                       }}
                       onPointerMove={(e) => {
+                        const ptrIndex = activePointers.current.findIndex(p => p.id === e.pointerId);
+                        if (ptrIndex !== -1) {
+                          activePointers.current[ptrIndex] = { id: e.pointerId, x: e.clientX, y: e.clientY };
+                        }
+
                         if (dragState && dragState.id === i) {
-                          const dx = e.clientX - dragState.startX;
-                          const dy = e.clientY - dragState.startY;
-                          if (!dragState.isDragging && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+                          const pts = activePointers.current;
+                          const avgX = pts.length > 0 ? pts.reduce((s, p) => s + p.x, 0) / pts.length : e.clientX;
+                          const avgY = pts.length > 0 ? pts.reduce((s, p) => s + p.y, 0) / pts.length : e.clientY;
+
+                          const dx = avgX - dragState.startX;
+                          const dy = avgY - dragState.startY;
+
+                          if (!dragState.isDragging && (Math.abs(dx) > 3 || Math.abs(dy) > 3 || pts.length > 1)) {
                             setDragState(prev => prev ? { ...prev, isDragging: true } : prev);
                           }
-                          if (dragState.isDragging) {
+
+                          if (dragState.isDragging || pts.length > 1) {
+                            if (pts.length === 2 && dragState.initPinchDist) {
+                              // Pinch-to-zoom
+                              const currDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+                              const scaleRatio = currDist / dragState.initPinchDist;
+                              // Use an arbitrary sensible clamp (e.g. 50% to 500%)
+                              const newScale = Math.min(Math.max(dragState.initScale * scaleRatio, 50), 500);
+                              updateCellProp(i, 'scale', newScale);
+                            }
+
                             // Scale down delta by the zoom factor so it feels 1:1
                             const adjDx = dx / (cell.scale / 100);
                             const adjDy = dy / (cell.scale / 100);
+
+                            // Only update offsets if we are dragging (or zooming while moving)
                             updateCellProp(i, 'offsetX', dragState.initOffsetX + adjDx);
                             updateCellProp(i, 'offsetY', dragState.initOffsetY + adjDy);
                           }
@@ -959,43 +1011,77 @@ function App() {
                       }}
                       onPointerUp={(e) => {
                         e.currentTarget.releasePointerCapture(e.pointerId);
-                        setDragState(null);
+                        activePointers.current = activePointers.current.filter(p => p.id !== e.pointerId);
+                        if (activePointers.current.length === 0) {
+                          setDragState(null);
+                        } else {
+                          // Reset drag start state for remaining pointers to avoid jumps
+                          const pts = activePointers.current;
+                          const avgX = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+                          const avgY = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+                          setDragState(prev => prev ? {
+                            ...prev,
+                            startX: avgX,
+                            startY: avgY,
+                            initOffsetX: cell.offsetX,
+                            initOffsetY: cell.offsetY,
+                            initPinchDist: null
+                          } : null);
+                        }
                       }}
                       onPointerCancel={(e) => {
                         e.currentTarget.releasePointerCapture(e.pointerId);
-                        setDragState(null);
+                        activePointers.current = activePointers.current.filter(p => p.id !== e.pointerId);
+                        if (activePointers.current.length === 0) {
+                          setDragState(null);
+                        }
                       }}
                     >
                       {cell.imageUrl ? (
                         cell.mediaType === 'video' ? (
-                          <video
-                            src={cell.imageUrl}
-                            autoPlay
-                            loop
-                            muted
-                            playsInline
-                            style={{
-                              display: 'block',
-                              width: '100%',
-                              height: '100%',
-                              objectFit: cell.objectFit,
-                              transform: `scale(${cell.scale / 100}) translate(${cell.offsetX}px, ${cell.offsetY}px)`,
-                            }}
-                          />
+                          <div style={{
+                            position: 'absolute',
+                            width: '100%', height: '100%',
+                            display: 'flex', justifyContent: 'center', alignItems: 'center'
+                          }}>
+                            <video
+                              src={cell.imageUrl}
+                              autoPlay
+                              loop
+                              muted
+                              playsInline
+                              style={{
+                                position: 'absolute',
+                                minWidth: cell.objectFit === 'cover' ? '100%' : 'auto',
+                                minHeight: cell.objectFit === 'cover' ? '100%' : 'auto',
+                                maxWidth: cell.objectFit === 'contain' ? '100%' : 'none',
+                                maxHeight: cell.objectFit === 'contain' ? '100%' : 'none',
+                                transform: `translate(${cell.offsetX}px, ${cell.offsetY}px) scale(${cell.scale / 100})`,
+                              }}
+                            />
+                          </div>
                         ) : (
-                          <img
-                            src={cell.imageUrl}
-                            alt=""
-                            style={{
-                              width: '100%',
-                              height: '100%',
-                              objectFit: cell.objectFit,
-                              filter: getFilterString(cell.filters),
-                              transform: `scale(${cell.scale / 100}) translate(${cell.offsetX}px, ${cell.offsetY}px)`,
-                              transition: dragState?.isDragging && dragState?.id === i ? 'none' : 'transform 0.1s ease, filter 0.3s ease',
-                            }}
-                            draggable={false}
-                          />
+                          <div style={{
+                            position: 'absolute',
+                            width: '100%', height: '100%',
+                            display: 'flex', justifyContent: 'center', alignItems: 'center'
+                          }}>
+                            <img
+                              src={cell.imageUrl}
+                              alt=""
+                              style={{
+                                position: 'absolute',
+                                minWidth: cell.objectFit === 'cover' ? '100%' : 'auto',
+                                minHeight: cell.objectFit === 'cover' ? '100%' : 'auto',
+                                maxWidth: cell.objectFit === 'contain' ? '100%' : 'none',
+                                maxHeight: cell.objectFit === 'contain' ? '100%' : 'none',
+                                filter: getFilterString(cell.filters),
+                                transform: `translate(${cell.offsetX}px, ${cell.offsetY}px) scale(${cell.scale / 100})`,
+                                transition: dragState?.isDragging && dragState?.id === i ? 'none' : 'transform 0.1s ease, filter 0.3s ease',
+                              }}
+                              draggable={false}
+                            />
+                          </div>
                         )
                       ) : (
                         <label className="cell-upload">
