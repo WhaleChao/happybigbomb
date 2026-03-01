@@ -414,11 +414,46 @@ function App() {
         });
       });
     } else {
-      setCells(prev => prev.map(c =>
-        c.id === cellId
-          ? { ...c, imageUrl: objectUrl, objectUrl, mediaType, duration: 0 }
-          : c
-      ));
+      // Normal Image
+      const img = new Image();
+      img.onload = () => {
+        const mediaAR = img.naturalWidth / img.naturalHeight;
+        const cell = cells.find(c => c.id === cellId);
+
+        // Calculate cell aspect ratio based on layout (simplification: assume uniform cells for ratios)
+        // A more accurate approach would measure the actual DOM element, but we can approximate:
+        const isLandscape = currentAspectRatio.w > currentAspectRatio.h;
+        const layoutRatios = {
+          1: { w: currentAspectRatio.w, h: currentAspectRatio.h },
+          2: { w: currentAspectRatio.w, h: currentAspectRatio.h / 2 }, // 2 horizontal
+          3: { w: currentAspectRatio.w / 2, h: currentAspectRatio.h / 2 }, // 4 grid
+        };
+        const cellRatio = layoutIndex === 0 ? layoutRatios[1] : layoutIndex === 1 ? layoutRatios[2] : layoutRatios[3];
+        const cellAR = cellRatio.w / cellRatio.h;
+
+        let initialScale = 100;
+
+        // If image is "taller" than cell, it will be cropped top/bottom at scale 100 (which mimics cover)
+        // If image is "wider" than cell, it will be cropped left/right at scale 100
+        // To mimic "contain", we calculate how much to scale down.
+        if (mediaAR > cellAR) {
+          // w determines scale
+          initialScale = (cellAR / mediaAR) * 100;
+        } else {
+          // h determines scale
+          initialScale = (mediaAR / cellAR) * 100;
+        }
+
+        // Add a slight margin so it doesn't touch the very edges exactly
+        initialScale = initialScale * 0.95;
+
+        setCells(prev => prev.map(c =>
+          c.id === cellId
+            ? { ...c, imageUrl: objectUrl, objectUrl, mediaType, duration: 0, scale: initialScale, offsetX: 0, offsetY: 0 }
+            : c
+        ));
+      };
+      img.src = objectUrl;
     }
 
   };
