@@ -211,6 +211,9 @@ const PRESETS = [
 ];
 
 function getFilterString(f: CellData['filters']): string {
+  if (f.brightness === 100 && f.contrast === 100 && f.saturate === 100 && f.blur === 0 && f.grayscale === 0 && f.sepia === 0) {
+    return 'none';
+  }
   return `brightness(${f.brightness}%) contrast(${f.contrast}%) saturate(${f.saturate}%) blur(${f.blur}px) grayscale(${f.grayscale}%) sepia(${f.sepia}%)`;
 }
 
@@ -262,7 +265,8 @@ function drawCellMedia_Canvas(
 
   // Apply Filter
   const f = cell.filters;
-  ctx.filter = `brightness(${f.brightness}%) contrast(${f.contrast}%) saturate(${f.saturate}%) blur(${f.blur * exportScale}px) grayscale(${f.grayscale}%) sepia(${f.sepia}%)`;
+  const isDefault = f.brightness === 100 && f.contrast === 100 && f.saturate === 100 && f.blur === 0 && f.grayscale === 0 && f.sepia === 0;
+  ctx.filter = isDefault ? 'none' : `brightness(${f.brightness}%) contrast(${f.contrast}%) saturate(${f.saturate}%) blur(${f.blur * exportScale}px) grayscale(${f.grayscale}%) sepia(${f.sepia}%)`;
 
   // Apply Transform
   const cx = dx + dw / 2;
@@ -514,22 +518,51 @@ function App() {
   const exportAsPng = useCallback(async () => {
     if (!gridRef.current) return;
 
-    const { default: html2canvas } = await import('html2canvas');
-    const el = gridRef.current;
-    const rect = el.getBoundingClientRect();
-    const canvas = await html2canvas(el, {
-      backgroundColor: bgColor,
-      scale: 2,
-      useCORS: true,
-      logging: false,
-      width: rect.width,
-      height: rect.height,
+    const gridEl = gridRef.current;
+    const gridRect = gridEl.getBoundingClientRect();
+    const exportScale = 3; // High resolution for PNG
+    const cw = Math.round(gridRect.width * exportScale);
+    const ch = Math.round(gridRect.height * exportScale);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = cw;
+    canvas.height = ch;
+    const ctx = canvas.getContext('2d')!;
+
+    // Fill background
+    ctx.fillStyle = bgColor;
+    ctx.fillRect(0, 0, cw, ch);
+
+    const cellEls = gridEl.querySelectorAll('.grid-cell');
+
+    cellEls.forEach((cellEl, i) => {
+      const cell = cells[i];
+      const cellRect = cellEl.getBoundingClientRect();
+      const dx = (cellRect.left - gridRect.left) * exportScale;
+      const dy = (cellRect.top - gridRect.top) * exportScale;
+      const dw = cellRect.width * exportScale;
+      const dh = cellRect.height * exportScale;
+
+      ctx.save();
+      const r = borderRadius * exportScale;
+      ctx.beginPath();
+      ctx.roundRect(dx, dy, dw, dh, r);
+      ctx.clip();
+
+      const media = cellEl.querySelector('img, video') as HTMLImageElement | HTMLVideoElement | null;
+      if (!media) {
+        ctx.restore();
+        return;
+      }
+
+      drawCellMedia_Canvas(ctx, media, cell, dx, dy, dw, dh, exportScale);
+      ctx.restore();
     });
 
     canvas.toBlob((blob) => {
       if (blob) downloadBlob(blob, `story-grid-${Date.now()}.png`);
     }, 'image/png');
-  }, [bgColor, downloadBlob]);
+  }, [bgColor, borderRadius, cells, downloadBlob]);
 
   // --- Export as GIF (infinite loop) ---
   const [isRecording, setIsRecording] = useState(false);
