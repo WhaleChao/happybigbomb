@@ -345,18 +345,19 @@ function App() {
       tempVideo.preload = 'metadata';
       tempVideo.onloadedmetadata = () => {
         const dur = tempVideo.duration;
+        const mediaAR = tempVideo.videoWidth / tempVideo.videoHeight;
         setCells(prev => prev.map(c =>
           c.id === cellId
-            ? { ...c, duration: isFinite(dur) ? dur : 10 }
+            ? { ...c, duration: isFinite(dur) ? dur : 10, mediaAR: mediaAR || undefined }
             : c
         ));
         URL.revokeObjectURL(metaUrl); // Revoke the separate URL, not the cell's URL
       };
       tempVideo.src = metaUrl;
-      // Set cell immediately (duration will update when metadata loads)
+      // Set cell immediately (duration + mediaAR will update when metadata loads)
       setCells(prev => prev.map(c =>
         c.id === cellId
-          ? { ...c, imageUrl: objectUrl, objectUrl, mediaType, duration: 5 }
+          ? { ...c, imageUrl: objectUrl, objectUrl, mediaType, duration: 5, scale: 100, offsetX: 0, offsetY: 0 }
           : c
       ));
     } else if (isGif) {
@@ -409,49 +410,26 @@ function App() {
 
             setCells(prev => prev.map(c =>
               c.id === cellId
-                ? { ...c, imageUrl: objectUrl, objectUrl, mediaType, duration: totalDuration, gifFrames: currentFrames }
+                ? { ...c, imageUrl: objectUrl, objectUrl, mediaType, duration: totalDuration, gifFrames: currentFrames, scale: 100, offsetX: 0, offsetY: 0, mediaAR: gif.lsd.width / gif.lsd.height }
                 : c
             ));
           } catch (e) {
             console.error("GIF parse error", e);
-            setCells(prev => prev.map(c => c.id === cellId ? { ...c, imageUrl: objectUrl, objectUrl, mediaType, duration: 3 } : c));
+            setCells(prev => prev.map(c => c.id === cellId ? { ...c, imageUrl: objectUrl, objectUrl, mediaType, duration: 3, scale: 100, offsetX: 0, offsetY: 0 } : c));
           }
         });
       });
     } else {
-      // Normal Image
+      // Normal Image — use original blob URL directly for maximum quality
       const img = new Image();
       img.onload = () => {
         const mediaAR = img.naturalWidth / img.naturalHeight;
-        // Calculate cell aspect ratio based on layout (simplification: assume uniform cells for ratios)
-        // A more accurate approach would measure the actual DOM element, but we can approximate:
-        const layoutRatios = {
-          1: { w: currentAspectRatio.w, h: currentAspectRatio.h },
-          2: { w: currentAspectRatio.w, h: currentAspectRatio.h / 2 }, // 2 horizontal
-          3: { w: currentAspectRatio.w / 2, h: currentAspectRatio.h / 2 }, // 4 grid
-        };
-        const cellRatio = layoutIndex === 0 ? layoutRatios[1] : layoutIndex === 1 ? layoutRatios[2] : layoutRatios[3];
-        const cellAR = cellRatio.w / cellRatio.h;
 
-        let initialScale = 100;
-
-        // If image is "taller" than cell, it will be cropped top/bottom at scale 100 (which mimics cover)
-        // If image is "wider" than cell, it will be cropped left/right at scale 100
-        // To mimic "contain", we calculate how much to scale down.
-        if (mediaAR > cellAR) {
-          // w determines scale
-          initialScale = (cellAR / mediaAR) * 100;
-        } else {
-          // h determines scale
-          initialScale = (mediaAR / cellAR) * 100;
-        }
-
-        // Add a slight margin so it doesn't touch the very edges exactly
-        initialScale = initialScale * 0.95;
-
+        // Default to cover mode (scale 100) for best quality.
+        // The user can zoom in/out via pinch or the slider.
         setCells(prev => prev.map(c =>
           c.id === cellId
-            ? { ...c, imageUrl: objectUrl, objectUrl, mediaType, duration: 0, scale: initialScale, offsetX: 0, offsetY: 0, mediaAR: mediaAR }
+            ? { ...c, imageUrl: objectUrl, objectUrl, mediaType, duration: 0, scale: 100, offsetX: 0, offsetY: 0, mediaAR: mediaAR }
             : c
         ));
       };
@@ -1151,6 +1129,8 @@ function App() {
                                 filter: getFilterString(cell.filters),
                                 transform: `translate(${cell.offsetX}px, ${cell.offsetY}px) scale(${cell.scale / 100})`,
                                 transition: dragState?.isDragging && dragState?.id === i ? 'none' : 'transform 0.1s ease, filter 0.3s ease',
+                                imageRendering: '-webkit-optimize-contrast' as any,
+                                willChange: 'transform',
                               }}
                               draggable={false}
                             />
