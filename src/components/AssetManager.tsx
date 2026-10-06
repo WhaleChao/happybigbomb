@@ -1,47 +1,71 @@
-import React from 'react';
-import { Plus } from 'lucide-react';
+import { useId, useRef, useState } from 'react';
+import { ImagePlus } from 'lucide-react';
+import { ACCEPT } from '../lib/media';
 
 interface AssetManagerProps {
-    onAddImage: (url: string) => void;
-    onAddVideo: (url: string) => void;
+  /** 選好的檔案；由呼叫端依序放進空白格子 */
+  onFiles: (files: File[]) => void;
+  emptyCount: number;
+  disabled?: boolean;
 }
 
-const AssetManager: React.FC<AssetManagerProps> = ({ onAddImage, onAddVideo }) => {
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files;
-        if (!files) return;
+/** 一次加入多個檔案（點選或拖曳），依序填入空白格子 */
+export default function AssetManager({ onFiles, emptyCount, disabled }: AssetManagerProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [over, setOver] = useState(false);
+  const hintId = useId();
 
-        Array.from(files).forEach((file) => {
-            const url = URL.createObjectURL(file);
-            if (file.type.startsWith('image/')) {
-                onAddImage(url);
-            } else if (file.type.startsWith('video/')) {
-                onAddVideo(url);
-            }
-        });
-    };
+  const take = (list: FileList | null | undefined) => {
+    const files = list ? Array.from(list) : [];
+    if (files.length) onFiles(files);
+  };
 
-    return (
-        <div className="asset-manager">
-            <label className="upload-btn glass-morphism">
-                <Plus size={24} />
-                <span>Add Media</span>
-                <input
-                    type="file"
-                    multiple
-                    accept="image/*,video/*"
-                    onChange={handleFileUpload}
-                    hidden
-                />
-            </label>
-
-            <div className="asset-grid">
-                <p style={{ color: 'var(--secondary)', fontSize: '0.75rem', textAlign: 'center', marginTop: '12px' }}>
-                    Supports Photos & Videos
-                </p>
-            </div>
-        </div>
-    );
-};
-
-export default AssetManager;
+  return (
+    <div
+      className={`dropzone${over ? ' is-over' : ''}`}
+      onDragOver={(e) => {
+        if (disabled || !e.dataTransfer.types.includes('Files')) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'copy';
+        setOver(true);
+      }}
+      onDragLeave={() => setOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setOver(false);
+        if (!disabled) take(e.dataTransfer.files);
+      }}
+    >
+      <button
+        type="button"
+        className="btn btn-outline btn-block"
+        onClick={() => inputRef.current?.click()}
+        disabled={disabled}
+        aria-describedby={hintId}
+        aria-label="一次加入多張照片或影片"
+      >
+        <ImagePlus size={18} aria-hidden="true" />
+        <span>加入照片或影片</span>
+      </button>
+      <p id={hintId} className="dropzone-hint">
+        {emptyCount > 0
+          ? `可一次選多個檔案，會依序填入 ${emptyCount} 個空白格子；也可以直接拖曳到這裡。`
+          : '格子都滿了；新加入的檔案會從第 1 格開始替換。'}
+      </p>
+      <input
+        ref={inputRef}
+        type="file"
+        accept={ACCEPT}
+        multiple
+        hidden
+        tabIndex={-1}
+        onChange={(e) => {
+          take(e.target.files);
+          // 清空，才能再次選擇同一個檔案
+          e.target.value = '';
+        }}
+      />
+    </div>
+  );
+}

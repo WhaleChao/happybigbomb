@@ -1,24 +1,16 @@
 {
-    "name": "小皮大霹靂",
-    "short_name": "小皮大霹靂",
-    "description": "照片組合編輯器 - 製作 IG 限時動態與社群貼文",
-    "start_url": "./",
-    "display": "standalone",
-    "background_color": "#09090b",
-    "theme_color": "#3b82f6",
-    "orientation": "any",
-    "icons": [
-        {
-            "src": "./icon-192.png",
-            "sizes": "192x192",
-            "type": "image/png",
-            "purpose": "any maskable"
-        },
-        {
-            "src": "./icon-512.png",
-            "sizes": "512x512",
-            "type": "image/png",
-            "purpose": "any maskable"
-        }
-    ]
+  "name": "小皮大霹靂 照片組合編輯器",
+  "short_name": "小皮大霹靂",
+  "description": "在瀏覽器內完成的照片組合編輯器，照片不會上傳。",
+  "lang": "zh-Hant-TW",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f1ea",
+  "theme_color": "#c23a1e",
+  "orientation": "any",
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
 }
