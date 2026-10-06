@@ -1,39 +1,24 @@
 <!doctype html>
-<html lang="zh-TW">
-
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>小皮大霹靂 - 照片組合編輯器</title>
-  <meta name="description" content="製作 IG 限時動態與社群貼文的照片組合工具" />
-
-  <!-- PWA -->
-  <link rel="manifest" href="./manifest.json" />
-  <meta name="theme-color" content="#3b82f6" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="小皮大霹靂" />
-  <link rel="apple-touch-icon" href="./icon-192.png" />
-
-  <!-- Favicon -->
-  <link rel="icon" type="image/png" href="./icon-192.png" />
-
-  <!-- Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
-</head>
-
-<body>
-  <div id="root"></div>
-  <script type="module" src="/src/main.tsx"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js');
-      });
-    }
-  </script>
-</body>
-
+<html lang="zh-Hant-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <title>小皮大霹靂｜照片組合編輯器</title>
+    <meta name="description" content="把多張照片、影片或 GIF 排成限時動態與社群貼文。所有處理都在你的瀏覽器完成，照片不會上傳。" />
+    <meta name="theme-color" content="#f4f1ea" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#151412" media="(prefers-color-scheme: dark)" />
+    <meta name="referrer" content="no-referrer" />
+    <link rel="manifest" href="%BASE_URL%manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="小皮大霹靂" />
+    <link rel="apple-touch-icon" href="%BASE_URL%icon-192.png" />
+    <link rel="icon" type="image/png" href="%BASE_URL%icon-192.png" />
+  </head>
+  <body>
+    <noscript>這個編輯器需要啟用 JavaScript 才能使用。照片只在你的瀏覽器處理，不會上傳。</noscript>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
 </html>

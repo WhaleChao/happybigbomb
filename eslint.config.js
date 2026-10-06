@@ -6,7 +6,7 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 
 export default defineConfig([
-  globalIgnores(['dist']),
+  globalIgnores(['dist', 'dist-relative', 'playwright-report', 'test-results', 'coverage']),
   {
     files: ['**/*.{ts,tsx}'],
     extends: [
@@ -16,8 +16,22 @@ export default defineConfig([
       reactRefresh.configs.vite,
     ],
     languageOptions: {
-      ecmaVersion: 2020,
+      ecmaVersion: 2022,
       globals: globals.browser,
     },
+  },
+  {
+    files: ['vite.config.ts', 'playwright.config.ts', 'config/**/*.ts', 'e2e/**/*.ts'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
+  {
+    files: ['public/sw.js'],
+    extends: [js.configs.recommended],
+    languageOptions: { globals: globals.serviceworker },
+  },
+  {
+    files: ['scripts/**/*.mjs'],
+    extends: [js.configs.recommended],
+    languageOptions: { globals: globals.node },
   },
 ])

@@ -1,74 +1,347 @@
+/* =========================================================
+   小皮大霹靂：設計 token
+   概念：紙與印。暖白紙面、墨色文字、一枚朱紅印記作為唯一強調色。
+   ========================================================= */
+
 :root {
-  --primary: #ffffff;
-  --secondary: #a1a1aa;
-  --accent: #3b82f6;
-  --background: #09090b;
-  --surface: #18181b;
-  --surface-hover: #27272a;
-  --glass: rgba(24, 24, 27, 0.7);
-  --border: rgba(255, 255, 255, 0.1);
-  --radius-lg: 16px;
-  --radius-md: 12px;
-  --font-main: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color-scheme: light;
+
+  /* 色彩（淺色） */
+  --bg: #f4f1ea;
+  --surface: #faf8f3;
+  --surface-sunken: #e9e4d8;
+  --surface-raised: #ffffff;
+  --ink: #1b1a17;
+  --ink-2: #4f4b43;
+  --ink-3: #6f695f;
+  --line: #dcd5c6;
+  --line-strong: #b8af9c;
+  --accent: #c23a1e;
+  --accent-hover: #a83118;
+  --accent-ink: #ffffff;
+  --accent-soft: #f5e1d9;
+  --focus: #1d4ed8;
+  --danger-bg: #fbe9e4;
+  --danger-line: #e2a493;
+  --success: #2f6b3f;
+  --shadow-board: 0 1px 2px rgb(27 26 23 / 0.08), 0 18px 40px -12px rgb(27 26 23 / 0.28);
+  --shadow-pop: 0 24px 60px -20px rgb(27 26 23 / 0.35);
+
+  /* 字體：系統字型，不載入外部字型 */
+  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, 'PingFang TC', 'Noto Sans TC', 'Microsoft JhengHei',
+    'Heiti TC', 'Segoe UI', Roboto, sans-serif;
+  --font-num: ui-monospace, 'SF Mono', 'Roboto Mono', Menlo, Consolas, monospace;
+
+  /* 字級 */
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-md: 0.9375rem;
+  --fs-lg: 1.125rem;
+  --fs-xl: 1.375rem;
+
+  /* 間距（4 的倍數） */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --hit: 44px;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --dur: 160ms;
+}
+
+/* 深色：跟隨系統（未手動指定時） */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+    --bg: #151412;
+    --surface: #1c1b18;
+    --surface-sunken: #0e0d0b;
+    --surface-raised: #24221f;
+    --ink: #f1ece2;
+    --ink-2: #c4bdb0;
+    --ink-3: #9a9387;
+    --line: #322f2a;
+    --line-strong: #4b4740;
+    --accent: #ff7a59;
+    --accent-hover: #ff9273;
+    --accent-ink: #1b0d08;
+    --accent-soft: #3a211a;
+    --focus: #8ab4ff;
+    --danger-bg: #3a1d17;
+    --danger-line: #7a3a2b;
+    --success: #7fc694;
+    --shadow-board: 0 1px 2px rgb(0 0 0 / 0.5), 0 24px 60px -16px rgb(0 0 0 / 0.75);
+    --shadow-pop: 0 24px 60px -16px rgb(0 0 0 / 0.8);
+  }
+}
+
+/* 深色：手動指定 */
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --bg: #151412;
+  --surface: #1c1b18;
+  --surface-sunken: #0e0d0b;
+  --surface-raised: #24221f;
+  --ink: #f1ece2;
+  --ink-2: #c4bdb0;
+  --ink-3: #9a9387;
+  --line: #322f2a;
+  --line-strong: #4b4740;
+  --accent: #ff7a59;
+  --accent-hover: #ff9273;
+  --accent-ink: #1b0d08;
+  --accent-soft: #3a211a;
+  --focus: #8ab4ff;
+  --danger-bg: #3a1d17;
+  --danger-line: #7a3a2b;
+  --success: #7fc694;
+  --shadow-board: 0 1px 2px rgb(0 0 0 / 0.5), 0 24px 60px -16px rgb(0 0 0 / 0.75);
+  --shadow-pop: 0 24px 60px -16px rgb(0 0 0 / 0.8);
+}
+
+/* ---------- 基礎 ---------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
 * {
-  box-sizing: border-box;
   margin: 0;
-  padding: 0;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 body {
-  font-family: var(--font-main);
-  background-color: var(--background);
-  color: var(--primary);
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--fs-md);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+/* 輸入框字級至少 16px，避免 iOS 自動放大 */
+input,
+select,
+textarea {
+  font-size: max(16px, 1em);
+}
+
+img,
+video,
+canvas,
+svg {
+  display: block;
+}
+
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.sr-only {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
   overflow: hidden;
-  height: 100vh;
-  width: 100vw;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
 }
 
-#root {
-  height: 100%;
+.skip-link {
+  position: absolute;
+  left: var(--sp-4);
+  top: -100px;
+  z-index: 100;
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
 }
 
-.glass-morphism {
-  background: var(--glass);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid var(--border);
+.skip-link:focus {
+  top: var(--sp-2);
 }
 
-.gradient-bg {
-  background: radial-gradient(circle at top left, #1e1b4b 0%, #09090b 50%, #020617 100%);
+/* ---------- 按鈕 ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-2);
+  min-height: var(--hit);
+  padding: 0 var(--sp-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background-color var(--dur) var(--ease),
+    border-color var(--dur) var(--ease),
+    color var(--dur) var(--ease);
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .btn-primary {
   background: var(--accent);
-  color: white;
-  border: none;
-  padding: 8px 16px;
-  border-radius: var(--radius-md);
+  color: var(--accent-ink);
+}
+
+.btn-primary:not(:disabled):hover {
+  background: var(--accent-hover);
+}
+
+.btn-outline {
+  border-color: var(--line-strong);
+  background: var(--surface-raised);
+}
+
+.btn-outline:not(:disabled):hover {
+  border-color: var(--ink);
+}
+
+.btn-ghost {
+  padding: 0 var(--sp-3);
+  color: var(--ink-2);
+}
+
+.btn-ghost:not(:disabled):hover {
+  background: var(--surface-sunken);
+  color: var(--ink);
+}
+
+.btn-icon {
+  width: var(--hit);
+  padding: 0;
+  color: var(--ink-2);
+}
+
+.btn-icon:not(:disabled):hover {
+  background: var(--surface-sunken);
+  color: var(--ink);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.btn-link {
+  min-height: var(--hit);
+  padding: 0;
+  color: var(--ink-2);
   font-weight: 500;
+  font-size: var(--fs-sm);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.btn-link:hover {
+  color: var(--ink);
+}
+
+/* ---------- 滑桿 ---------- */
+
+input[type='range'] {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: var(--hit);
+  background: transparent;
   cursor: pointer;
-  transition: all 0.2s ease;
+  touch-action: pan-y;
 }
 
-.btn-primary:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
+input[type='range']::-webkit-slider-runnable-track {
+  height: 2px;
+  background: var(--line-strong);
+  border-radius: 2px;
 }
 
-.btn-secondary {
-  background: var(--surface);
-  color: var(--primary);
-  border: 1px solid var(--border);
-  padding: 8px 16px;
-  border-radius: var(--radius-md);
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
+input[type='range']::-moz-range-track {
+  height: 2px;
+  background: var(--line-strong);
+  border-radius: 2px;
 }
 
-.btn-secondary:hover {
-  background: var(--surface-hover);
+input[type='range']::-moz-range-progress {
+  height: 2px;
+  background: var(--ink);
+}
+
+input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px;
+  height: 18px;
+  margin-top: -8px;
+  border-radius: 50%;
+  background: var(--surface-raised);
+  border: 2px solid var(--ink);
+  transition: transform var(--dur) var(--ease);
+}
+
+input[type='range']::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--surface-raised);
+  border: 2px solid var(--ink);
+}
+
+input[type='range']:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+}
+
+input[type='range']:focus-visible {
+  outline-offset: -4px;
+}
+
+input[type='range']:disabled {
+  cursor: not-allowed;
+}
+
+/* ---------- 尊重減少動態 ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
