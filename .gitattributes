@@ -1,0 +1,6 @@
+# Windows 批次檔必須是 CRLF，否則 cmd.exe 會誤判行尾
+*.bat text eol=crlf
+*.cmd text eol=crlf
+# macOS／Linux shell 腳本一律 LF
+*.sh text eol=lf
+*.command text eol=lf

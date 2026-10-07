@@ -59,7 +59,18 @@ config/base.ts                VITE_BASE 解析
 推送到 `main` 後，`.github/workflows/deploy.yml` 會執行 lint、測試、建置並發布到 GitHub Pages（設定為 *GitHub Actions* 來源）。
 `ci.yml` 會在每個 Pull Request 跑 lint、單元測試、建置、靜態檢查與 Playwright 冒煙測試。
 
-舊的 `.bat`、`auto_deploy.py` 與 `gh-pages` 套件部署方式已移除（Pages 來源早已改為 Actions，那些腳本寫死 Windows 路徑且會直接推 main）。
+### 本機維護腳本（Windows／macOS 雙版本）
+
+| 用途 | Windows | macOS |
+| --- | --- | --- |
+| 安裝相依套件（`npm ci`） | `tools\windows\npm_install.bat` | `tools/mac/npm_install.sh` |
+| 完整檢查（lint、測試、建置） | `tools\windows\check_build.bat` | `tools/mac/check_build.sh` |
+| 只建置，輸出存到 `build_output.txt` | `tools\windows\test_build.bat` | `tools/mac/test_build.sh` |
+| 本機檢查通過後提交並推送到 `main` | `tools\windows\push_updates.bat [說明]` | `tools/mac/push_updates.sh [說明]` |
+| 同上（Python 版，兩邊通用） | `python tools\auto_deploy.py "說明"` | `python3 tools/auto_deploy.py "說明"` |
+
+腳本以自己所在位置找專案根目錄，不寫死磁碟路徑（例如 `K:\happybigbomb`）。
+推送後由 GitHub Actions 自動部署，所以不再使用舊的 `npm run deploy`（`gh-pages` 套件）。
 
 ## 嵌入到其他網站
 
